@@ -1,0 +1,47 @@
+# Copyright 2010-2011 Nicolas Limare <nicolas.limare@cmla.ens-cachan.fr>
+#
+# Copying and distribution of this file, with or without
+# modification, are permitted in any medium without royalty provided
+# the copyright notice and this notice are preserved.  This file is
+# offered as-is, without any warranty.
+#
+# This makefile imports and compiles libraries libraries
+# for local use in static form
+
+LIBPNG_LIB	= $(LIB_DIR)/libpng.a
+LIBPNG_INC	= $(addprefix $(INC_DIR)/, png.h pngconf.h pnglibconf.h)
+LIBPNG_FILES	= $(LIBPNG_LIB) $(LIBPNG_INC)
+LIBPNG_DIR	= libpng-1.5.4
+LIBPNG_ARC	= libpng-1.5.4.tar.gz
+LIBPNG_URL	= http://download.sourceforge.net/libpng/libpng-1.5.4.tar.gz
+
+#
+# LIBPNG
+#
+
+.PHONY	: libpng 
+libpng	: $(LIBPNG_FILES)
+
+$(LIBPNG_FILES)	: $(LIB_DIR) $(INC_DIR)
+$(LIB_DIR)/libpng.a	: $(LIBPNG_DIR)/lib/libpng.a
+$(INC_DIR)/png.h	: $(LIBPNG_DIR)/png.h
+$(INC_DIR)/pngconf.h	: $(LIBPNG_DIR)/pngconf.h
+$(INC_DIR)/pnglibconf.h	: $(LIBPNG_DIR)/pnglibconf.h
+
+$(LIBPNG_DIR)/lib/libpng.a	: $(LIBPNG_DIR) $(ZLIB_FILES)
+	cd ./$(LIBPNG_DIR)/; ./configure \
+		--enable-static \
+		--disable-shared \
+		--prefix=$$PWD
+	$(MAKE) -C $(LIBPNG_DIR) libpng15.la ZLIBLIB=../ ZLIBINC=../
+	$(MAKE) -C $(LIBPNG_DIR) install
+$(LIBPNG_DIR)/png.h	: $(LIBPNG_DIR)
+$(LIBPNG_DIR)/pngconf.h	: $(LIBPNG_DIR)
+$(LIBPNG_DIR)/pnglibconf.h	: $(LIBPNG_DIR)
+
+$(LIBPNG_DIR) : $(LIBPNG_ARC)
+	tar xvzf $<
+	touch $@
+
+$(LIBPNG_ARC) :
+	curl -L $(LIBPNG_URL) > $@ || $(RM) $@
