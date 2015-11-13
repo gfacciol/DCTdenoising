@@ -1,5 +1,0 @@
-include
-lib
-libpng-*
-zlib-*
-*.tar.gz

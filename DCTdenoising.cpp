@@ -185,22 +185,15 @@ void ColorTransform(vector<float>&, vector<float>&, int, int, int);
 // width, height, channel: image width, height and number of channels.
 // sigma: standard deviation of Gaussian white noise in ipixels.
 void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
-                  int height, int channel, float sigma, int flag_dct16x16)
+                  int height, int channel, float sigma, int dct_sz)
 {
     // Threshold
     float Th = 3 * sigma;
 
     // DCT window size
-    int width_p, height_p;
-    if (flag_dct16x16 == 0) {
-        width_p = 16;
-        height_p = 16;
-    } else {
-        width_p = 8;
-        height_p = 8;
-    }
+    int width_p=dct_sz, height_p=dct_sz;
 
-    _DCT2D_init(width_p, 1);
+    _DCT2D_init(dct_sz, 1);
 
     int num_patches = (width - width_p + 1) * (height - height_p + 1);
 
