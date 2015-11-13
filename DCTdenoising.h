@@ -1,6 +1,7 @@
 /*
- * Copyright (c) 2010, Guoshen Yu <yu@cmap.polytechnique.fr>,
- *                     Guillermo Sapiro <guille@umn.edu>
+ * Original code Copyright (c) 2010, Guoshen Yu <yu@cmap.polytechnique.fr>,
+ *                                   Guillermo Sapiro <guille@umn.edu>
+ * Modified code Copyright (c) 2015, Gabriele Facciolo <gfacciol@gmail.com>
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify

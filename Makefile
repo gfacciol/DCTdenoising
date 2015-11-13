@@ -3,8 +3,6 @@ CSRC	= io_png/io_png.c \
 			mt19937ar.c
 # C++ source code
 CXXSRC	= DCTdenoising.cpp \
-		DCT2D16x16.cpp \
-		DCT2D.cpp \
 		demo_DCTdenoising.cpp 
 
 CXXSRC2 = img_diff_ipol.cpp img_mse_ipol.cpp
@@ -39,7 +37,7 @@ CFLAGS	= $(COPT)  \
 CXXFLAGS	= $(CXXOPT)  \
 	-Wno-write-strings -Wno-deprecated -ansi
 # link flags
-LDFLAGS	= -lpng -lm
+LDFLAGS	= -lpng -lm -lfftw3f
 
 # use local embedded libraries with `make LOCAL_LIBS=1`
 ifdef LOCAL_LIBS

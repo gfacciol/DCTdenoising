@@ -1,6 +1,7 @@
 /*
- * Copyright (c) 2010, Guoshen Yu <yu@cmap.polytechnique.fr>,
- *                     Guillermo Sapiro <guille@umn.edu>
+ * Original code Copyright (c) 2010, Guoshen Yu <yu@cmap.polytechnique.fr>,
+ *                                   Guillermo Sapiro <guille@umn.edu>
+ * Modified code Copyright (c) 2015, Gabriele Facciolo <gfacciol@gmail.com>
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -31,13 +32,128 @@
 #include <stdio.h>
 #include <math.h>
 #include "DCTdenoising.h"
-#include "DCT2D.h"
-#include "DCT2D16x16.h"
+
+#include <fftw3.h>
+#include <stdlib.h>
 
 
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
+
+// Thread pool and intermeiary variables
+fftwf_plan plan_forward[100];
+fftwf_plan plan_backward[100];
+float* dataspace[100];
+float* datafreq[100];
+int psz = -1;
+
+
+void _DCT2D_init(int sz, int nch) {
+   unsigned int w=sz ,h=sz;
+   unsigned int N = w*h*nch;
+   psz = sz;
+
+   int nthreads = 1; 
+   
+#ifdef _OPENMP 
+   nthreads = omp_get_max_threads();
+   if ( nthreads > 100 ) exit(1);
+#endif
+
+   for (int i=0; i<nthreads; i++) {
+      dataspace[i] = (float*) fftwf_malloc(sizeof(float) * N);
+      datafreq[i]  = (float*) fftwf_malloc(sizeof(float) * N);
+
+      int n[] = {(int)w, (int)h};
+      fftwf_r2r_kind dct2[] = {FFTW_REDFT10, FFTW_REDFT10};
+      plan_forward[i] = fftwf_plan_many_r2r(2, n, nch, dataspace[i], NULL, 1, w * h,
+                                            datafreq[i], NULL, 1, w * h,
+                                            dct2, FFTW_ESTIMATE);
+
+      fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
+      plan_backward[i] = fftwf_plan_many_r2r(2, n, nch, datafreq[i], NULL, 1, w * h,
+                                            dataspace[i], NULL, 1, w * h,
+                                            idct2, FFTW_ESTIMATE);
+   }
+}
+
+
+void _DCT2D_end() {
+   int nthreads = 1; 
+   
+#ifdef _OPENMP 
+   nthreads = omp_get_max_threads();
+   if ( nthreads > 100 ) exit(1);
+#endif
+
+   for (int i=0; i<nthreads; i++) {
+      free(dataspace[i]);
+      free(datafreq[i]);
+      fftwf_destroy_plan(plan_forward[i]);
+      fftwf_destroy_plan(plan_backward[i]);
+   }
+}
+
+
+void _DCT2D(vector< vector< float > >& patch, int invflag) {
+   int tid = 0;
+#ifdef _OPENMP 
+   tid = omp_get_thread_num();
+#endif
+
+   fftwf_plan p;
+   float *idata, *odata;
+   if (invflag>0) { 
+      p = plan_forward[tid];
+      idata = dataspace[tid];
+      odata = datafreq[tid];
+
+      float norm = 1.0/(2*psz);
+      float isqrt2 = 1.0/sqrt(2.0);
+
+      for (int j=0, t=0; j<psz; j++)
+         for (int i=0; i<psz; i++, t++) 
+            idata[t] = patch[j][i];
+   
+      fftwf_execute(p);
+   
+      for (int j=0, t=0; j<psz; j++) 
+         for (int i=0; i<psz; i++, t++)
+            patch[j][i] = odata[t] * norm;
+      
+      for (int i=0; i<psz; i++) {
+            patch[0][i] *= isqrt2;
+            patch[i][0] *= isqrt2;
+      }
+   } else {
+      p = plan_backward[tid];
+      idata = datafreq[tid];
+      odata = dataspace[tid];
+
+      float norm = 1.0/(2*psz);
+      float isqrt2 = sqrt(2);
+
+      for (int i=0; i<psz; i++) {
+            patch[0][i] *= isqrt2;
+            patch[i][0] *= isqrt2;
+      }
+
+      for (int j=0, t=0; j<psz; j++)
+         for (int i=0; i<psz; i++, t++) 
+            idata[t] = patch[j][i] * norm;
+   
+      fftwf_execute(p);
+   
+      for (int j=0, t=0; j<psz; j++) 
+         for (int i=0; i<psz; i++, t++)
+            patch[j][i] = odata[t];
+   }
+}
+
+
+
 
 #define ABS(x)    (((x) > 0) ? (x) : (-(x)))
 
@@ -84,6 +200,8 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
         height_p = 8;
     }
 
+    _DCT2D_init(width_p, 1);
+
     int num_patches = (width - width_p + 1) * (height - height_p + 1);
 
     std::vector< vector< vector< vector< float > > > > patches;
@@ -120,10 +238,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
 #pragma omp parallel for private(p)
     for (int p = 0; p < num_patches; p ++) {
         for (int k = 0; k < channel; k ++) {
-            if (flag_dct16x16 == 0)
-                DCT2D16x16(patches[p][k], 1);
-            else
-                DCT2D(patches[p][k], 1);
+            _DCT2D(patches[p][k], 1);
         }
     }
 
@@ -141,10 +256,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
 #pragma omp parallel for private(p)
     for (int p = 0; p < num_patches; p ++) {
         for (int k = 0; k < channel; k ++) {
-            if (flag_dct16x16 == 0)
-                DCT2D16x16(patches[p][k], -1);
-            else
-                DCT2D(patches[p][k], -1);
+            _DCT2D(patches[p][k], -1);
         }
 
     }
@@ -165,6 +277,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
         Patches2Image(opixels, patches, width, height, channel, width_p,
                       height_p);
     }
+    _DCT2D_end();
 }
 
 // Transfer an image im of size width x height x channel to sliding patches of 
