@@ -47,16 +47,19 @@ fftwf_plan plan_forward[100];
 fftwf_plan plan_backward[100];
 float* dataspace[100];
 float* datafreq[100];
-int psz = -1;
+
+int _DCT2D_psz = -1;
+int _DCT2D_nch = -1;
 
 
 void _DCT2D_init(int sz, int nch) {
-   unsigned int w=sz ,h=sz;
+   _DCT2D_psz = sz;
+   _DCT2D_nch = nch;
+   unsigned int w = sz, h = sz;
    unsigned int N = w*h*nch;
-   psz = sz;
 
    int nthreads = 1; 
-   
+
 #ifdef _OPENMP 
    nthreads = omp_get_max_threads();
    if ( nthreads > 100 ) exit(1);
@@ -69,20 +72,20 @@ void _DCT2D_init(int sz, int nch) {
       int n[] = {(int)w, (int)h};
       fftwf_r2r_kind dct2[] = {FFTW_REDFT10, FFTW_REDFT10};
       plan_forward[i] = fftwf_plan_many_r2r(2, n, nch, dataspace[i], NULL, 1, w * h,
-                                            datafreq[i], NULL, 1, w * h,
-                                            dct2, FFTW_ESTIMATE);
+            datafreq[i], NULL, 1, w * h,
+            dct2, FFTW_ESTIMATE);
 
       fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
       plan_backward[i] = fftwf_plan_many_r2r(2, n, nch, datafreq[i], NULL, 1, w * h,
-                                            dataspace[i], NULL, 1, w * h,
-                                            idct2, FFTW_ESTIMATE);
+            dataspace[i], NULL, 1, w * h,
+            idct2, FFTW_ESTIMATE);
    }
 }
 
 
 void _DCT2D_end() {
    int nthreads = 1; 
-   
+
 #ifdef _OPENMP 
    nthreads = omp_get_max_threads();
    if ( nthreads > 100 ) exit(1);
@@ -97,11 +100,15 @@ void _DCT2D_end() {
 }
 
 
-void _DCT2D(vector< vector< float > >& patch, int invflag) {
+void _DCT2D(vector< float > & patch, int invflag) {
    int tid = 0;
 #ifdef _OPENMP 
    tid = omp_get_thread_num();
 #endif
+
+   int psz = _DCT2D_psz;
+   int nch = _DCT2D_nch;
+   int N = psz*psz*nch;
 
    fftwf_plan p;
    float *idata, *odata;
@@ -113,42 +120,40 @@ void _DCT2D(vector< vector< float > >& patch, int invflag) {
       float norm = 1.0/(2*psz);
       float isqrt2 = 1.0/sqrt(2.0);
 
-      for (int j=0, t=0; j<psz; j++)
-         for (int i=0; i<psz; i++, t++) 
-            idata[t] = patch[j][i];
-   
+      for (int i=0; i<N; i++) 
+         idata[i] = patch[i];
+
       fftwf_execute(p);
-   
-      for (int j=0, t=0; j<psz; j++) 
-         for (int i=0; i<psz; i++, t++)
-            patch[j][i] = odata[t] * norm;
-      
-      for (int i=0; i<psz; i++) {
-            patch[0][i] *= isqrt2;
-            patch[i][0] *= isqrt2;
-      }
+
+      for (int i=0; i<N; i++) 
+         patch[i] = odata[i] * norm;
+
+      for (int t=0; t<nch; t++) 
+         for (int i=0; i<psz; i++) {
+            patch[t*psz*psz + i    ] *= isqrt2;
+            patch[t*psz*psz + i*psz] *= isqrt2;
+         }
    } else {
       p = plan_backward[tid];
       idata = datafreq[tid];
       odata = dataspace[tid];
 
       float norm = 1.0/(2*psz);
-      float isqrt2 = sqrt(2);
+      float sqrt2 = sqrt(2);
 
-      for (int i=0; i<psz; i++) {
-            patch[0][i] *= isqrt2;
-            patch[i][0] *= isqrt2;
-      }
+      for (int t=0; t<nch; t++) 
+         for (int i=0; i<psz; i++) {
+            patch[t*psz*psz + i    ] *= sqrt2;
+            patch[t*psz*psz + i*psz] *= sqrt2;
+         }
 
-      for (int j=0, t=0; j<psz; j++)
-         for (int i=0; i<psz; i++, t++) 
-            idata[t] = patch[j][i] * norm;
-   
+      for (int i=0; i<N; i++) 
+         idata[i] = patch[i] * norm;
+
       fftwf_execute(p);
-   
-      for (int j=0, t=0; j<psz; j++) 
-         for (int i=0; i<psz; i++, t++)
-            patch[j][i] = odata[t];
+
+      for (int i=0; i<N; i++) 
+         patch[i] = odata[i];
    }
 }
 
@@ -174,178 +179,110 @@ const float DCTbasis3x3[3][3] = {
         0.4082483053207397460937500000000000000000      }
 };
 
-void Image2Patches(vector<float>&, 
-     vector< vector< vector< vector< float > > > >&, int, int, int, int, int);
-void Patches2Image(vector<float>&, 
-     vector< vector< vector< vector< float > > > >&, int, int, int, int, int);
 void ColorTransform(vector<float>&, vector<float>&, int, int, int);
+
+
+void extract_patch(vector<float> &im, int width, int height, int channel, 
+      int i, int j, vector<float> &patch, int width_p, int height_p) {
+   // loop over the pixels in the patch
+   int size1 = width * height;
+   for (int kp = 0; kp < channel; kp++)
+      for (int jp = 0; jp < height_p; jp ++)
+         for (int ip = 0; ip < width_p; ip ++) {
+            patch[kp*width_p*height_p + jp*width_p + ip] = 
+               im[kp*size1 + (j+jp)*width + i + ip];
+         }
+}
 
 // Denoise an image with sliding DCT thresholding.
 // ipixels, opixels: noisy and denoised images.
 // width, height, channel: image width, height and number of channels.
 // sigma: standard deviation of Gaussian white noise in ipixels.
 void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
-                  int height, int channel, float sigma, int dct_sz)
+      int height, int channel, float sigma, int dct_sz)
 {
-    // Threshold
-    float Th = 3 * sigma;
+   // Threshold
+   float Th = 3 * sigma;
 
-    // DCT window size
-    int width_p=dct_sz, height_p=dct_sz;
+   // DCT window size
+   const int width_p=dct_sz, height_p=dct_sz;
 
-    _DCT2D_init(dct_sz, 1);
+   _DCT2D_init(dct_sz, channel);
 
-    int num_patches = (width - width_p + 1) * (height - height_p + 1);
+   std::vector<float> tpixels = ipixels;
+   if (channel == 3) {
+      tpixels.resize(width*height*channel);
+      // 3-point DCT transform in the color dimension
+      ColorTransform(ipixels, tpixels, width, height, 1);
+   } 
 
-    std::vector< vector< vector< vector< float > > > > patches;
-    patches.resize(num_patches);
-    for (int p = 0; p < num_patches; p ++) {
-        patches[p].resize(channel);
-        for (int k = 0; k < channel; k ++) {
-            patches[p][k].resize(height_p);
-            for (int j = 0; j < height_p; j ++)
-                patches[p][k][j].resize(width_p);
-        }
-    }
+   const int size1 = width * height;
+   const int size = size1 * channel;
 
-    // If the image is colored (3 channels), first decorrelate
-    // the color channels with a 3-point DCT transform
-    // in the color dimension.
-    if (channel == 3) {
-        std::vector<float> tpixels;
-        tpixels.resize(width*height*channel);
+   // clean the image
+   std::vector<float> im(size);
+   for (int i = 0; i < size; i ++)
+      im[i] = 0;
 
-        // 3-point DCT transform in the color dimension
-        ColorTransform(ipixels, tpixels, width, height, 1);
+   // Store the weight
+   std::vector<float> im_weight(size);
+   for (int i = 0; i < size; i ++)
+      im_weight[i] = 0;
 
-        // Decompose the image into patches
-        Image2Patches(tpixels, patches, width, height, channel, width_p,
-                      height_p);
-    } else {
-        // Decompose the image into patches
-        Image2Patches(ipixels, patches, width, height, channel, width_p,
-                      height_p);
-    }
+   // Loop over the patch positions
+#pragma omp parallel for 
+   for (int j = 0; j < height - height_p + 1; j ++)
+      for (int i = 0; i < width - width_p + 1; i ++) {
 
-    // 2D DCT forward
-#pragma omp parallel for private(p)
-    for (int p = 0; p < num_patches; p ++) {
-        for (int k = 0; k < channel; k ++) {
-            _DCT2D(patches[p][k], 1);
-        }
-    }
+         vector< float >  patch(channel*height_p*width_p);
 
-    // Thresholding
-#pragma omp parallel for private(p)
-    for (int p = 0; p < num_patches; p ++)
-        for (int k = 0; k < channel; k ++)
-            for (int j = 0; j < height_p; j ++)
-                for (int i = 0; i < width_p; i ++) {
-                    if ( ABS(patches[p][k][j][i]) < Th )
-                        patches[p][k][j][i] = 0;
-                }
+         // extract one patch
+         extract_patch(tpixels, width, height, channel, i, j, patch, width_p, height_p);
 
-    // 2D DCT inverse
-#pragma omp parallel for private(p)
-    for (int p = 0; p < num_patches; p ++) {
-        for (int k = 0; k < channel; k ++) {
-            _DCT2D(patches[p][k], -1);
-        }
+         // 2D DCT forward
+         _DCT2D(patch, 1);
 
-    }
+         // Thresholding
+         for (int kp = 0; kp < channel; kp ++)
+            for (int jp = 0; jp < height_p; jp ++)
+               for (int ip = 0; ip < width_p; ip ++) {
+                  int idx = kp*width_p*height_p + jp*width_p + ip;
+                  if ( ABS(patch[idx]) < Th )
+                     patch[idx] = 0;
+               }
 
-    // If the image is colored (3 channels), reverse the 3-point DCT transform
-    // in the color dimension.
-    if (channel == 3) {
-        std::vector<float> tpixels;
-        tpixels.resize(width*height*channel);
+         // 2D DCT inverse
+         _DCT2D(patch, -1);
 
-        // Decompose the image into patches
-        Patches2Image(tpixels, patches, width, height, channel, width_p,
-                      height_p);
+         for (int kp = 0; kp < channel; kp ++)
+            for (int jp = 0; jp < height_p; jp ++)
+               for (int ip = 0; ip < width_p; ip ++) {
+                  int idx = kp*width_p*height_p + jp*width_p + ip;
+                  int idxim = kp*size1 + (j+jp)*width + i + ip;
+                  im[idxim] += patch[idx];
+                  im_weight[idxim] ++;
+               }
 
-        // inverse 3-point DCT transform in the color dimension
-        ColorTransform(tpixels, opixels, width, height, -1);
-    } else {
-        Patches2Image(opixels, patches, width, height, channel, width_p,
-                      height_p);
-    }
-    _DCT2D_end();
+      }
+
+
+   // Normalize by the weight
+   for (int i = 0; i < size; i ++)
+      im[i] = im[i] / im_weight[i];
+
+
+   // If the image is colored (3 channels), reverse the 3-point DCT transform
+   // in the color dimension.
+   if (channel == 3) {
+      // inverse 3-point DCT transform in the color dimension
+      ColorTransform(im, opixels, width, height, -1);
+   } else {
+      opixels = im;
+   }
+
+   _DCT2D_end();
 }
 
-// Transfer an image im of size width x height x channel to sliding patches of 
-// size width_p x height_p xchannel.
-// The patches are stored in patches, where each ROW is a patch after being 
-// reshaped to a vector.
-void Image2Patches(vector<float>& im, 
-                   vector< vector< vector< vector< float > > > >& patches, 
-                   int width, int height, int channel, int width_p, 
-                   int height_p)
-{
-    int size1 = width * height;
-
-    int counter_patch = 0;
-
-    // Loop over the patch positions
-    for (int j = 0; j < height - height_p + 1; j ++)
-        for (int i = 0; i < width - width_p + 1; i ++) {
-            int counter_pixel = 0;
-            // loop over the pixels in the patch
-            for (int kp = 0; kp < channel; kp++)
-                for (int jp = 0; jp < height_p; jp ++)
-                    for (int ip = 0; ip < width_p; ip ++) {
-                        patches[counter_patch][kp][jp][ip] = 
-                                         im[kp*size1 + (j+jp)*width + i + ip];
-                        counter_pixel ++;
-                    }
-            counter_patch ++;
-        }
-}
-
-// Transfer sliding patches of size width_p x height_p xchannel to an image im 
-// of size width x height x channel.
-// The patches are stored in patches, where each ROW is a patch after being 
-// reshaped to a vector.
-void Patches2Image(vector<float>& im, 
-                   vector< vector< vector< vector< float > > > >& patches, 
-                   int width, int height, int channel, int width_p, 
-                   int height_p)
-{
-    int size1 = width * height;
-    int size = size1 * channel;
-
-    // clean the image
-    for (int i = 0; i < size; i ++)
-        im[i] = 0;
-
-    // Store the weight
-    std::vector<float> im_weight;
-    im_weight.resize(size);
-    for (int i = 0; i < size; i ++)
-        im_weight[i] = 0;
-
-    int counter_patch = 0;
-
-    // Loop over the patch positions
-    for (int j = 0; j < height - height_p + 1; j ++)
-        for (int i = 0; i < width - width_p + 1; i ++) {
-            int counter_pixel = 0;
-            // loop over the pixels in the patch
-            for (int kp = 0; kp < channel; kp++)
-                for (int jp = 0; jp < height_p; jp ++)
-                    for (int ip = 0; ip < width_p; ip ++) {
-                        im[kp*size1 + (j+jp)*width + i + ip] += 
-                                       patches[counter_patch][kp][jp][ip];
-                        im_weight[kp*size1 + (j+jp)*width + i + ip] ++;
-                        counter_pixel ++;
-                    }
-            counter_patch ++;
-        }
-
-    // Normalize by the weight
-    for (int i = 0; i < size; i ++)
-        im[i] = im[i] / im_weight[i];
-}
 
 // Do a 3-point DCT transform in the image color dimension.
 // flag=1/-1 --> forward/inverse transform
