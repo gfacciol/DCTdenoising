@@ -36,6 +36,11 @@
 #include <fftw3.h>
 #include <stdlib.h>
 
+extern "C" {
+#include "smapa.h"
+}
+
+SMART_PARAMETER_FLOAT(HARD_THRESHOLD,2.7) // hard threshold value from BM3D
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -202,7 +207,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
       int height, int channel, float sigma, int dct_sz)
 {
    // Threshold
-   float Th = 3 * sigma;
+   float Th = HARD_THRESHOLD() * sigma; 
 
    // DCT window size
    const int width_p=dct_sz, height_p=dct_sz;
@@ -221,13 +226,9 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
 
    // clean the image
    std::vector<float> im(size);
-   for (int i = 0; i < size; i ++)
-      im[i] = 0;
-
-   // Store the weight
    std::vector<float> im_weight(size);
    for (int i = 0; i < size; i ++)
-      im_weight[i] = 0;
+      im[i] = im_weight[i] = 0;
 
    // Loop over the patch positions
 #pragma omp parallel for 
@@ -243,13 +244,19 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
          _DCT2D(patch, 1);
 
          // Thresholding
+         double patch_weight = 0;
          for (int kp = 0; kp < channel; kp ++)
             for (int jp = 0; jp < height_p; jp ++)
                for (int ip = 0; ip < width_p; ip ++) {
                   int idx = kp*width_p*height_p + jp*width_p + ip;
                   if ( ABS(patch[idx]) < Th )
                      patch[idx] = 0;
+                  else
+                     patch_weight ++;
                }
+         // patch weights
+         //patch_weight = 1.0/fmax(1, patch_weight);
+         patch_weight = 1.0;
 
          // 2D DCT inverse
          _DCT2D(patch, -1);
@@ -259,8 +266,9 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
                for (int ip = 0; ip < width_p; ip ++) {
                   int idx = kp*width_p*height_p + jp*width_p + ip;
                   int idxim = kp*size1 + (j+jp)*width + i + ip;
-                  im[idxim] += patch[idx];
-                  im_weight[idxim] ++;
+                  im[idxim] += patch_weight * patch[idx];
+                  //im_weight[idxim] ++;
+                  im_weight[idxim] += patch_weight;
                }
 
       }
@@ -282,6 +290,108 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
 
    _DCT2D_end();
 }
+
+
+
+// Denoise an image with sliding DCT thresholding.
+// ipixels, gpixels, opixels: noisy, guide and denoised images.
+// width, height, channel: image width, height and number of channels.
+// sigma: standard deviation of Gaussian white noise in ipixels.
+void DCTdenoisingGuided(vector<float>& ipixels, vector<float>& gpixels,  vector<float>& opixels, int width,
+      int height, int channel, float sigma, int dct_sz)
+{
+   // Threshold
+   float sigma2 = sigma * sigma;
+
+   // DCT window size
+   const int width_p=dct_sz, height_p=dct_sz;
+
+   _DCT2D_init(dct_sz, channel);
+
+   std::vector<float> tpixels = ipixels;
+   std::vector<float> tgpixels = gpixels;
+   if (channel == 3) {
+      tpixels.resize(width*height*channel);
+      tgpixels.resize(width*height*channel);
+      // 3-point DCT transform in the color dimension
+      ColorTransform(ipixels, tpixels, width, height, 1);
+      ColorTransform(gpixels, tgpixels, width, height, 1);
+   } 
+
+   const int size1 = width * height;
+   const int size = size1 * channel;
+
+   // clean the image
+   std::vector<float> im(size);
+   std::vector<float> im_weight(size);
+   for (int i = 0; i < size; i ++)
+      im[i] = im_weight[i] = 0;
+
+   // Loop over the patch positions
+#pragma omp parallel for 
+   for (int j = 0; j < height - height_p + 1; j ++)
+      for (int i = 0; i < width - width_p + 1; i ++) {
+
+         vector< float >  patch(channel*height_p*width_p);
+         vector< float >  gpatch(channel*height_p*width_p);
+
+         // extract one patch
+         extract_patch(tpixels, width, height, channel, i, j, patch, width_p, height_p);
+         extract_patch(tgpixels, width, height, channel, i, j, gpatch, width_p, height_p);
+
+         // 2D DCT forward
+         _DCT2D(patch, 1);
+         _DCT2D(gpatch, 1);
+
+         // Wiener
+         double patch_weight = 0;
+         for (int kp = 0; kp < channel; kp ++)
+            for (int jp = 0; jp < height_p; jp ++)
+               for (int ip = 0; ip < width_p; ip ++) {
+                  int idx = kp*width_p*height_p + jp*width_p + ip;
+                  float G2 = gpatch[idx] * gpatch[idx];
+                  float w = G2 / ( G2 + sigma2 );
+                  patch[idx] = patch[idx] * w;
+                  patch_weight += w*w;
+               }
+         // patch weights
+         //patch_weight = 1.0/patch_weight;
+         patch_weight = 1.0;
+
+         // 2D DCT inverse
+         _DCT2D(patch, -1);
+
+         for (int kp = 0; kp < channel; kp ++)
+            for (int jp = 0; jp < height_p; jp ++)
+               for (int ip = 0; ip < width_p; ip ++) {
+                  int idx = kp*width_p*height_p + jp*width_p + ip;
+                  int idxim = kp*size1 + (j+jp)*width + i + ip;
+                  im[idxim] += patch_weight * patch[idx];
+                  //im_weight[idxim] ++;
+                  im_weight[idxim] += patch_weight;
+               }
+
+      }
+
+
+   // Normalize by the weight
+   for (int i = 0; i < size; i ++)
+      im[i] = im[i] / im_weight[i];
+
+
+   // If the image is colored (3 channels), reverse the 3-point DCT transform
+   // in the color dimension.
+   if (channel == 3) {
+      // inverse 3-point DCT transform in the color dimension
+      ColorTransform(im, opixels, width, height, -1);
+   } else {
+      opixels = im;
+   }
+
+   _DCT2D_end();
+}
+
+
 
 
 // Do a 3-point DCT transform in the image color dimension.

@@ -32,3 +32,4 @@ using namespace std;
 
 
 void DCTdenoising(vector<float>&, vector<float>&, int, int, int, float, int);
+void DCTdenoisingGuided(vector<float>&, vector<float>&, vector<float>&, int, int, int, float, int);

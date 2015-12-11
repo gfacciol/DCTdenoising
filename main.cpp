@@ -85,7 +85,7 @@ int load_image(
 ,   unsigned * chnls
 ){
     //! read input image
-	cout << endl << "Read input image...";
+	cout << "Read input image "<< name << "...";
 	size_t h, w, c;
 	float *tmp = NULL;
    int ih, iw, ic;
@@ -97,7 +97,6 @@ int load_image(
 		cout << "error :: " << name << " not found or not a correct image" << endl;
 		return EXIT_FAILURE;
 	}
-	cout << "done." << endl;
 
 	//! test if image is really a color image and exclude the alpha channel
 	if (c > 2)
@@ -109,10 +108,7 @@ int load_image(
 	}
 
 	//! Some image informations
-	cout << "image size :" << endl;
-	cout << " - width          = " << w << endl;
-	cout << " - height         = " << h << endl;
-	cout << " - nb of channels = " << c << endl;
+	cout << "(" << w <<  "x" << h << "x" << c << ")" << endl;
 
 	//! Initializations
 	*width  = w;
@@ -123,6 +119,50 @@ int load_image(
         img[k] = tmp[k];
 
     return EXIT_SUCCESS;
+}
+
+int sym(int x, int nx) {
+   return  (x)<0 ?  \
+          ( -(x)-1 >= nx  ? nx-1: -(x)-1 )  :  \
+          ( (x) >= nx ? (-(x)+2*nx-1 < 0 ? 0 : -(x)+2*nx-1)   : (x)  ) ;
+}
+
+vector<float> padimage (vector<float> in, unsigned int *w, unsigned int *h, unsigned int *c, unsigned int pad) {
+   int outw=*w+2*pad;
+   int outh=*h+2*pad;
+   int outc=*c;
+
+   vector<float> out (outc*outw*outh);
+
+   for(int k=0; k<outc; k++)
+   for(int j=0; j<outh; j++)
+   for(int i=0; i<outw; i++) {
+      out[i + j*outw + k*outw*outh] = 
+         in[ sym(i-pad,*w) + sym(j-pad,*h)**w + k**w**h];
+   }
+   *w=outw;
+   *h=outh;
+   return out;
+}
+
+
+vector<float> unpadimage (vector<float> in, unsigned int *w, unsigned int *h, unsigned int *c, unsigned int pad) {
+   int outw=*w-2*pad;
+   int outh=*h-2*pad;
+   int outc=*c;
+
+   if(outw<=0 || outh<=0) return in;
+   vector<float> out (outc*outw*outh);
+
+   for(int k=0; k<outc; k++)
+   for(int j=0; j<outh; j++)
+   for(int i=0; i<outw; i++) {
+      out[i + j*outw + k*outw*outh] = 
+         in[ (i+pad) + (j+pad)**w + k**w**h];
+   }
+   *w=outw;
+   *h=outh;
+   return out;
 }
 
 int nextPowOf2(int n) {
@@ -160,38 +200,62 @@ int main(int argc, char **argv)
 {
    //! Variables initialization
    unsigned int dctsz = atoi(pick_option(&argc, argv, "w", "16"));
+   bool only1step = pick_option(&argc, argv, "1", NULL) ? true : false;
+   const char *guide2ndstep = pick_option(&argc, argv, "2", "");
+   bool no1ststep = guide2ndstep[0] != '\0';
+   if (no1ststep) only1step = false;
+
 //   //next power of two? 
 //   dctsz = nextPowOf2(dctsz);
 //   cout << "patch size: " << dctsz << endl;
 
    //! Check if there is the right call for the algorithm
    if (argc < 4) {
-      cerr << "usage: " << argv[0] << " input sigma output\n\
-         [-w {8,16} DCT window size 8x8, 16x16 (default)]" << endl;
+      cerr << "usage: " << argv[0] << " input sigma output\n"
+         "[-1         if set disable 2nd step (soft thresholding)]\n"
+         "[-2 guide   use the guide image and disable the 1st step]\n"
+         "[-w {8,16}  DCT window size 8x8, 16x16 (default)]\n";
       return EXIT_FAILURE;
    }
 
    //! Declarations
-   vector<float> img_noisy, img_denoised;
+   vector<float> img_noisy, img_denoised, img_guide;
    unsigned width, height, chnls;
 
    //! Load image
    if(load_image(argv[1], img_noisy, &width, &height, &chnls) != EXIT_SUCCESS)
       return EXIT_FAILURE;
+//   img_noisy = padimage(img_noisy, &width, &height, &chnls, dctsz);
 
    float fSigma = atof(argv[2]);
 
    //! Denoising
+   img_guide.resize(img_noisy.size());
    img_denoised.resize(img_noisy.size());
-   DCTdenoising(img_noisy, img_denoised, width, height, chnls, fSigma, dctsz);
+
+   if(no1ststep) {
+      if(load_image((char *) guide2ndstep, img_guide, &width, &height, &chnls) != EXIT_SUCCESS)
+      return EXIT_FAILURE;
+      cerr << "only step2 " << endl;
+ //     img_guide = padimage(img_guide, &width, &height, &chnls, dctsz);
+   } else {
+      DCTdenoising(img_noisy, img_guide, width, height, chnls, fSigma, dctsz);
+   }
+
+   if(only1step)  {
+      img_denoised = img_guide;
+      cerr << "only step1 " << endl;
+   }
+   else {
+      DCTdenoisingGuided(img_noisy, img_guide, img_denoised, width, height, chnls, fSigma, dctsz);
+   }
 
    //! save noisy, denoised and differences images
-   cout << endl << "Save images...";
+   //cout << "Save images."<< endl;
 
+  // img_denoised = unpadimage(img_denoised, &width, &height, &chnls, dctsz);
    if (save_image(argv[3], img_denoised, width, height, chnls, false) != EXIT_SUCCESS)
       return EXIT_FAILURE;
-
-   cout << "done." << endl;
 
    return EXIT_SUCCESS;
 }

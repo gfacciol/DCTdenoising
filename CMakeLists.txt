@@ -44,7 +44,7 @@ link_libraries (${TIFF_LIBRARIES} ${JPEG_LIBRARIES} ${PNG_LIBRARIES} ${FFTWF_LIB
 
 set(SOURCE_FILES
    DCTdenoising.cpp      main.cpp
-   DCTdenoising.h iio.h iio.c
+   DCTdenoising.h iio.h iio.c smapa.h
 )
 
 set_property(SOURCE iio.c PROPERTY COMPILE_FLAGS "-Wno-unused-variable -Wno-unused-parameter -Wno-pointer-sign -Wno-parentheses -Wno-deprecated-declarations -Wno-unused-function")
