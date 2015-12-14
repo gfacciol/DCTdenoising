@@ -40,7 +40,8 @@ extern "C" {
 #include "smapa.h"
 }
 
-SMART_PARAMETER_FLOAT(HARD_THRESHOLD,2.7) // hard threshold value from BM3D
+SMART_PARAMETER_FLOAT(HARD_THRESHOLD,3.0) // hard threshold value from BM3D
+SMART_PARAMETER_INT(COLOR_TRANSFORM,1) // disable color transform
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -215,7 +216,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
    _DCT2D_init(dct_sz, channel);
 
    std::vector<float> tpixels = ipixels;
-   if (channel == 3) {
+   if (channel == 3 && COLOR_TRANSFORM() ) {
       tpixels.resize(width*height*channel);
       // 3-point DCT transform in the color dimension
       ColorTransform(ipixels, tpixels, width, height, 1);
@@ -281,7 +282,7 @@ void DCTdenoising(vector<float>& ipixels, vector<float>& opixels, int width,
 
    // If the image is colored (3 channels), reverse the 3-point DCT transform
    // in the color dimension.
-   if (channel == 3) {
+   if (channel == 3 && COLOR_TRANSFORM() ) {
       // inverse 3-point DCT transform in the color dimension
       ColorTransform(im, opixels, width, height, -1);
    } else {
@@ -310,7 +311,7 @@ void DCTdenoisingGuided(vector<float>& ipixels, vector<float>& gpixels,  vector<
 
    std::vector<float> tpixels = ipixels;
    std::vector<float> tgpixels = gpixels;
-   if (channel == 3) {
+   if (channel == 3 && COLOR_TRANSFORM() ) {
       tpixels.resize(width*height*channel);
       tgpixels.resize(width*height*channel);
       // 3-point DCT transform in the color dimension
@@ -381,7 +382,7 @@ void DCTdenoisingGuided(vector<float>& ipixels, vector<float>& gpixels,  vector<
 
    // If the image is colored (3 channels), reverse the 3-point DCT transform
    // in the color dimension.
-   if (channel == 3) {
+   if (channel == 3 && COLOR_TRANSFORM() ) {
       // inverse 3-point DCT transform in the color dimension
       ColorTransform(im, opixels, width, height, -1);
    } else {
