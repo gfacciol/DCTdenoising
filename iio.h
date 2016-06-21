@@ -176,7 +176,7 @@ uint16_t *iio_read_image_uint16_vec(const char *fname, int *w, int *h, int *pd);
 // EDITABLE CONFIGURATION:
 //
 #define IIO_MAX_DIMENSION 5
-//#define IIO_ABORT_ON_ERROR true
+#define IIO_ABORT_ON_ERROR true
 //
 //
 //
@@ -295,5 +295,8 @@ void iio_save_image_uint8_matrix(char *f, unsigned char **x, int w, int h);
 #define I_CAN_HAS_WGET
 
 #define I_CAN_KEEP_TMP_FILES
+#define I_CAN_HAS_LINUX
+#define I_CAN_POSIX
+
 
 #endif//_IIO_H

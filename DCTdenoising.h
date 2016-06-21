@@ -26,10 +26,10 @@
 /*---------------------------------------------------------------------------*/
 
 
-#include <vector>
-#include <iostream>
-using namespace std;
+#include "Image.hpp"
 
-
-void DCTdenoising(vector<float>&, vector<float>&, int, int, int, float, int);
-void DCTdenoisingGuided(vector<float>&, vector<float>&, vector<float>&, int, int, int, float, int);
+imgutils::Image DCTdenoising(const imgutils::Image &noisy, float sigma,
+                             int dct_size, int nthreads = 0);
+imgutils::Image DCTdenoisingGuided(const imgutils::Image &noisy,
+                                   const imgutils::Image &guide,
+                                   float sigma, int dct_size, int nthreads = 0);

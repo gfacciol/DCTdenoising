@@ -51,7 +51,7 @@
 #  define I_CAN_HAS_FMEMOPEN 1
 #endif
 
-#if _POSIX_C_SOURCE >= 200112L
+#if _POSIX_C_SOURCE >= 200112L || __OpenBSD__
 #  define I_CAN_HAS_MKSTEMP 1
 #endif
 
@@ -606,7 +606,7 @@ static void inplace_swap_pixels(struct iio_image *x, int i, int j, int a, int b)
 	if (x->dimension != 2)
 		fail("can only flip 2-dimensional images");
 	int w = x->sizes[0];
-	int h = x->sizes[1];
+	//int h = x->sizes[1]; // unused
 	int pixsize = x->pixel_dimension * iio_image_sample_size(x);
 	uint8_t *p = (i + j * w) * pixsize + (uint8_t*)x->data;
 	uint8_t *q = (a + b * w) * pixsize + (uint8_t*)x->data;
@@ -914,6 +914,7 @@ static void iio_convert_samples(struct iio_image *x, int desired_type)
 static void iio_hacky_colorize(struct iio_image *x, int pd)
 {
 	assert(!x->contiguous_data);
+	// TODO: do something sensible for 2 or 4 channels
 	if (x->pixel_dimension != 1)
 		fail("please, do not colorize color stuff");
 	int n = iio_image_number_of_elements(x);
@@ -2114,13 +2115,15 @@ static int read_beheaded_asc(struct iio_image *x,
 // 	- n characters are read
 // 	- a newline character is found
 // 	- the end of file is reached
-// returns the number of reac characters, not including the end zero
+// returns the number of read characters, not including the end zero
 // Calling this functions should always result in a valid string on l
 static int getlinen(char *l, int n, FILE *f)
 {
 	int c, i = 0;
 	while (i < n-1 && (c = fgetc(f)) != EOF && c != '\n')
-		l[i++] = c;
+		if (isprint(c))
+			l[i++] = c;
+	if (c == EOF) return -1;
 	l[i] = '\0';
 	return i;
 }
@@ -2131,11 +2134,13 @@ static void pds_parse_line(char *key, char *value, char *line)
 	int r = sscanf(line, "%s = %s\n", key, value);
 	if (r != 2) {
 		*key = *value = '\0'; return; }
+	IIO_DEBUG("PARSED \"%s\" = \"%s\"\n", key, value);
 }
 
 static int read_beheaded_pds(struct iio_image *x,
 		FILE *f, char *header, int nheader)
 {
+	(void)header; (void)nheader;
 	// check that the file is named, and not a pipe
 	const char *fn;
 	fn = global_variable_containing_the_name_of_the_last_opened_file;
@@ -2154,7 +2159,7 @@ static int read_beheaded_pds(struct iio_image *x,
 	int sfmt = SAMPLEFORMAT_UINT;
 	bool in_object = false;
 	bool flip_h = false, flip_v = false, allturn = false;
-	while (n = getlinen(line, nmax, f) && cx++ < nmax)
+	while ((n = getlinen(line, nmax, f)) >= 0  && cx++ < nmax)
 	{
 		pds_parse_line(key, value, line);
 		if (!*key || !*value) continue;
@@ -2171,6 +2176,7 @@ static int read_beheaded_pds(struct iio_image *x,
 		if (!strcmp(key, "SAMPLE_TYPE")) {
 			if (strstr(value, "REAL")) sfmt = SAMPLEFORMAT_IEEEFP;
 			if (strstr(value, "UNSIGNED")) sfmt = SAMPLEFORMAT_UINT;
+			if (strstr(value, "INTEGER"))sfmt=SAMPLEFORMAT_UINT;
 		}
 		if (!strcmp(key, "SAMPLE_DISPLAY_DIRECTION"))
 			flip_h = allturn !=! strcmp(value, "RIGHT");
@@ -2232,7 +2238,7 @@ static int read_beheaded_csv(struct iio_image *x,
 {
 	// load whole file
 	long filesize;
-	uint8_t *filedata = load_rest_of_file(&filesize, fin, header, nheader);
+	char *filedata = load_rest_of_file(&filesize, fin, header, nheader);
 
 	// height = number of newlines
 	int h = 0;
@@ -2303,7 +2309,7 @@ static int read_beheaded_csv(struct iio_image *x,
 //
 // w = width
 // h = height
-// d = pixel dimension (e.g. 1 or 3)
+// p = pixel dimension (e.g. 1 or 3)
 //
 // t =  one of "INT8", "UINT8", "INT16", "UINT16", "INT32", "UINT32", "INT64",
 // "UINT64", "FLOAT", "DOUBLE", "LONGDOUBLE", "HALF", "UINT1",
@@ -2343,16 +2349,16 @@ static char *raw_prefix(const char *f)
 	return colon;
 }
 
-// if f ~ /RWA[.*]:.*/ return the position of the colon
-static char *rwa_prefix(const char *f)
-{
-	if (f != strstr(f, "RWA["))
-		return NULL;
-	char *colon = strchr(f, ':');
-	if (!colon || colon[-1] != ']')
-		return NULL;
-	return colon;
-}
+//// if f ~ /RWA[.*]:.*/ return the position of the colon
+//static char *rwa_prefix(const char *f)
+//{
+//	if (f != strstr(f, "RWA["))
+//		return NULL;
+//	char *colon = strchr(f, ':');
+//	if (!colon || colon[-1] != ']')
+//		return NULL;
+//	return colon;
+//}
 
 // explicit raw reader (input = a given block of memory)
 static int parse_raw_binary_image_explicit(struct iio_image *x,
@@ -2373,8 +2379,12 @@ static int parse_raw_binary_image_explicit(struct iio_image *x,
 	iio_image_build_independent(x, 2, sizes, sample_type, pd);
 	size_t n = nsamples * ss;
 	memcpy(x->data, header_bytes + (char*)data, n);
-	if (endianness)
-		switch_4endianness(x->data, nsamples);
+	if (endianness) {
+      if (ss == 2)
+		   switch_2endianness(x->data, nsamples);
+      if (ss >= 4)
+		   switch_4endianness(x->data, nsamples);
+   }
 	return 0;
 }
 
@@ -2446,10 +2456,11 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 		switch(*tok) {
 		case 'w': width           = field;       break;
 		case 'h': height          = field;       break;
+		case 'd':
 		case 'p': pixel_dimension = field;       break;
 		case 'o': offset          = field;       break;
-		case 'b': brokenness      = 1;                 break;
-		case 'e': endianness      = 1;                 break;
+		case 'b': brokenness      = field;       break;
+		case 'e': endianness      = field;       break;
 		case 't': sample_type     = iio_inttyp(1+tok); break;
 		case 'r': orientation     = tok[1]+256*tok[2]; break;
 		}
@@ -2503,6 +2514,7 @@ static int read_raw_named_image(struct iio_image *x, const char *filespec)
 static int read_beheaded_raw(struct iio_image *x,
 		FILE *f, char *header, int nheader)
 {
+	(void)f; (void)header; (void)nheader;
 	const char *fn;
 	fn = global_variable_containing_the_name_of_the_last_opened_file;
 	if (!fn)
@@ -2948,7 +2960,7 @@ bool buffer_statistics_agree_with_csv(uint8_t *b, int n)
 	char tmp[n+1];
 	memcpy(tmp, b, n);
 	tmp[n] = '\0';
-	return n = strspn(tmp, "0123456789.e+-,\n");
+	return (n = strspn(tmp, "0123456789.e+-,na\n"));
 	//IIO_DEBUG("strcspn(\"%s\") = %d\n", tmp, r);
 }
 
@@ -2958,7 +2970,7 @@ static bool seekable_filenameP(const char *filename)
 		return false;
 #ifdef I_CAN_POSIX
 	FILE *f = xfopen(filename, "r");
-	int r = lseek(f, 0, SEEK_CUR);
+	int r = fseek(f, 0, SEEK_CUR);
 	xfclose(f);
 	return r != -1;
 #else
