@@ -52,11 +52,13 @@ int main(int argc, char **argv) {
   const float recompose_factor
       = static_cast<float>(atof(pick_option(&argc, argv, "c", ".8")));
   const int scales = atoi(pick_option(&argc, argv, "n", "5"));
+  const char *out_single = pick_option(&argc, argv, "single", "");
 
   //! Check if there is the right call for the algorithm
   if (usage || argc < 2) {
-    cerr << "usage: " << argv[0] << " sigma [input [output]] [-1 | -2 guide] " <<
-        "[-w patch_size (default 16)] [-c factor] [-n scales]" << endl;
+    cerr << "usage: " << argv[0] << " sigma [input [output]] [-1 | -2 guide] "
+         << "[-w patch_size (default 16)] [-c factor] [-n scales] "
+         << "[-single file]" << endl;
     return usage ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
@@ -94,6 +96,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  if (strlen(out_single)) save_image(denoised_p[0], out_single);
   Image result = recompose(denoised_p, recompose_factor);
 
   save_image(result, argc > 3 ? argv[3] : "TIFF:-");
