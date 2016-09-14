@@ -34,6 +34,7 @@ using imgutils::Image;
 using std::cerr;
 using std::endl;
 using std::move;
+using std::vector;
 
 /**
  * @file   main.cpp
@@ -48,11 +49,14 @@ int main(int argc, char **argv) {
   const bool no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
   const char *second_step_guide = pick_option(&argc, argv, "2", "");
   const bool no_first_step = second_step_guide[0] != '\0';
+  const float recompose_factor
+      = static_cast<float>(atof(pick_option(&argc, argv, "c", ".8")));
+  const int scales = atoi(pick_option(&argc, argv, "n", "5"));
 
   //! Check if there is the right call for the algorithm
-  if (usage || argc < 4) {
-    cerr << "usage: " << argv[0] << " input sigma output [-1 | -2 guide] " <<
-        "[-w patch_size (default 16)]" << endl;
+  if (usage || argc < 2) {
+    cerr << "usage: " << argv[0] << " sigma [input [output]] [-1 | -2 guide] " <<
+        "[-w patch_size (default 16)] [-c factor] [-n scales]" << endl;
     return usage ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
@@ -61,23 +65,38 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  Image noisy = read_image(argv[1]);
-  Image guide, result;
-  const float sigma = static_cast<float>(atof(argv[2]));
+#ifndef _OPENMP
+  cerr << "Warning: OpenMP not available. The algorithm will run in a single" <<
+       " thread." << endl;
+#endif
 
-  if (!no_first_step) {
-    guide = DCTdenoising(noisy, sigma, dct_sz);
-  } else {
-    guide = read_image(second_step_guide);
+  Image noisy = read_image(argc > 2 ? argv[2] : "-");
+  const float sigma = static_cast<float>(atof(argv[1]));
+  vector<Image> noisy_p = decompose(noisy, scales);
+  vector<Image> guide_p, denoised_p;
+  if (no_first_step) {
+    Image guide = read_image(second_step_guide);
+    guide_p = decompose(guide, scales);
   }
 
-  if (!no_second_step) {
-    result = DCTdenoisingGuided(noisy, guide, sigma, dct_sz);
-  } else {
-    result = move(guide);
+  for (int layer = 0; layer < scales; ++layer) {
+    float s = sigma * sqrt(static_cast<float>(noisy_p[layer].pixels()) / noisy.pixels());
+    if (!no_first_step) {
+      Image guide = DCTdenoising(noisy_p[layer], s, dct_sz);
+      guide_p.push_back(move(guide));
+    }
+    if (!no_second_step) {
+      Image result =
+          DCTdenoisingGuided(noisy_p[layer], guide_p[layer], s, dct_sz);
+      denoised_p.push_back(move(result));
+    } else {
+      denoised_p.push_back(move(guide_p[layer]));
+    }
   }
 
-  save_image(result, argv[3]);
+  Image result = recompose(denoised_p, recompose_factor);
+
+  save_image(result, argc > 3 ? argv[3] : "TIFF:-");
 
   return EXIT_SUCCESS;
 }

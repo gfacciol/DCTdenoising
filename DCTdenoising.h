@@ -25,6 +25,8 @@
 // Please report bugs and/or send comments to Guoshen Yu yu@cmap.polytechnique.fr
 /*---------------------------------------------------------------------------*/
 
+#ifndef DCTDENOISING_DCTDENOISING_HPP
+#define DCTDENOISING_DCTDENOISING_HPP
 
 #include "Image.hpp"
 
@@ -33,3 +35,5 @@ imgutils::Image DCTdenoising(const imgutils::Image &noisy, float sigma,
 imgutils::Image DCTdenoisingGuided(const imgutils::Image &noisy,
                                    const imgutils::Image &guide,
                                    float sigma, int dct_size, int nthreads = 0);
+
+#endif  // DCTDENOISING_DCTDENOISING_HPP

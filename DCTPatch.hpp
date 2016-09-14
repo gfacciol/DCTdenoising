@@ -5,8 +5,8 @@
  *      Author: nicola
  */
 
-#ifndef DFTPATCH_HPP_
-#define DFTPATCH_HPP_
+#ifndef DCTDENOISING_DFTPATCH_HPP_
+#define DCTDENOISING_DFTPATCH_HPP_
 
 #include <fftw3.h>
 #include <cassert>
@@ -120,4 +120,4 @@ inline void DCTPatch::ToSpace() {
 
 } /* namespace imgutils */
 
-#endif /* DFTPATCH_HPP_ */
+#endif  // DCTDENOISING_DFTPATCH_HPP_

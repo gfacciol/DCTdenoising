@@ -6,6 +6,7 @@
 #include <cstring>
 #include <cmath>
 #include <utility>
+#include <fftw3.h>
 #include "utils.hpp"
 
 extern "C" {
@@ -136,6 +137,80 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
     }
   }
   return result;
+}
+
+void dct_inplace(Image &img) {
+  int n[] = {img.rows(), img.columns()};
+  fftwf_r2r_kind dct2[] = {FFTW_REDFT10, FFTW_REDFT10};
+  fftwf_plan plan = fftwf_plan_many_r2r(2, n, img.channels(), img.data(), NULL,
+                                        1, img.pixels(), img.data(), NULL, 1,
+                                        img.pixels(), dct2, FFTW_ESTIMATE);
+  fftwf_execute(plan);
+  fftwf_destroy_plan(plan);
+
+  // Normalization
+  for (int i = 0; i < img.samples(); ++i) {
+    img.val(i) /= 4 * img.pixels();
+  }
+}
+
+void idct_inplace(Image &img) {
+  int n[] = {img.rows(), img.columns()};
+  fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
+  fftwf_plan plan = fftwf_plan_many_r2r(2, n, img.channels(), img.data(), NULL,
+                                        1, img.pixels(), img.data(), NULL, 1,
+                                        img.pixels(), idct2, FFTW_ESTIMATE);
+  fftwf_execute(plan);
+  fftwf_destroy_plan(plan);
+}
+
+vector<Image> decompose(const Image &img, int levels) {
+  vector<Image> pyramid;
+  Image freq = img.copy();
+  dct_inplace(freq);
+  int h{freq.rows()}, w{freq.columns()};
+  for (int i = 0; i < levels; ++i) {
+    // Copy data
+    Image layer(h, w, freq.channels());
+    for (int ch = 0; ch < freq.channels(); ++ch) {
+      for (int r = 0; r < h; ++r) {
+        for (int c = 0; c < w; ++c) {
+          layer.val(c, r, ch) = freq.val(c, r, ch);
+        }
+      }
+    }
+    // Inverse DCT
+    idct_inplace(layer);
+    w /= 2;
+    h /= 2;
+    pyramid.push_back(move(layer));
+  }
+  return pyramid;
+}
+
+Image recompose(const vector<Image> &pyramid, float recompose_factor) {
+  // Use the bigger image to determine width, height and number of channels
+  Image output = pyramid[0].copy();
+  // Perform the DCT
+  dct_inplace(output);
+
+  for (int i = 1; i < static_cast<int>(pyramid.size()); ++i) {
+    // Read level i of the pyramid
+    Image layer = pyramid[i].copy();
+    // Perform the DCT
+    dct_inplace(layer);
+    // Copy data (selected by recompose_factor)
+    for (int ch = 0; ch < layer.channels(); ++ch) {
+      for (int r = 0; r < layer.rows() * recompose_factor; ++r) {
+        for (int c = 0; c < layer.columns() * recompose_factor; ++c) {
+          output.val(c, r, ch) = layer.val(c, r, ch);
+        }
+      }
+    }
+  }
+  // IDCT of the output image
+  idct_inplace(output);
+  return output;
 }
 
 }  // namespace imgutils
