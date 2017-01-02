@@ -25,11 +25,15 @@
 // Please report bugs and/or send comments to Guoshen Yu yu@cmap.polytechnique.fr
 /*---------------------------------------------------------------------------*/
 
+#ifndef DCTDENOISING_DCTDENOISING_HPP
+#define DCTDENOISING_DCTDENOISING_HPP
 
-#include <vector>
-#include <iostream>
-using namespace std;
+#include "Image.hpp"
 
+imgutils::Image DCTdenoising(const imgutils::Image &noisy, float sigma,
+                             int dct_size, int nthreads = 0);
+imgutils::Image DCTdenoisingGuided(const imgutils::Image &noisy,
+                                   const imgutils::Image &guide,
+                                   float sigma, int dct_size, int nthreads = 0);
 
-void DCTdenoising(vector<float>&, vector<float>&, int, int, int, float, int);
-void DCTdenoisingGuided(vector<float>&, vector<float>&, vector<float>&, int, int, int, float, int);
+#endif  // DCTDENOISING_DCTDENOISING_HPP
