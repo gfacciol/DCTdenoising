@@ -1,12 +1,13 @@
-% DCT image denoising.
+% Multiscale DCT image denoising.
 
 # ABOUT
 
-* Modified version (2015) : Gabriele Facciolo <gfacciol@gmail.com>
+* Modified version (2016) : Nicola Pierazzo   <nicolapierazzo@gmail.com>
+* Modified version (2016) : Gabriele Facciolo <gfacciol@gmail.com>
 
 * Original Author    : Guoshen Yu <yu@cmap.polytechnique.fr>
 * Original Author    : Guillermo Sapiro <guille@umn.edu>
-* Copyright : (C) 2010 IPOL Image Processing On Line http://www.ipol.im/
+* Copyright : (C) 2017 IPOL Image Processing On Line http://www.ipol.im/
 * Licence   : GPL v3+, see GPLv3.txt
 
 # OVERVIEW
@@ -38,6 +39,8 @@ cmake ..; make;
 ./dctdenoising
  
 Example, run
+./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 16)] [-c factor] [-n scales] [-single file]
+
 ./dctdenoising ../noisy.tiff 15 denoised.png
 
 

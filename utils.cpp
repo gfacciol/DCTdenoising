@@ -164,6 +164,10 @@ void idct_inplace(Image &img) {
   fftwf_destroy_plan(plan);
 }
 
+/*! \brief Dyadic DCT pyramid decomposition.
+ *  
+ *  Returns a vector containing #levels images
+ */
 vector<Image> decompose(const Image &img, int levels) {
   vector<Image> pyramid;
   Image freq = img.copy();
@@ -188,6 +192,14 @@ vector<Image> decompose(const Image &img, int levels) {
   return pyramid;
 }
 
+/*! \brief Dyadic DCT pyramid conservative recomposition.
+ *  
+ *  Takes a vector containing the layers of the pyramid. Computes
+ *  the transform of each layer and recomposes the frequencies in a 
+ *  fine-to-coarse fashion, copying into the final result only the 
+ *  lowest recompose_factor frequencies of each coarse layer.
+ *  After inverting the DCT, returns the resulting image.
+ */
 Image recompose(const vector<Image> &pyramid, float recompose_factor) {
   // Use the bigger image to determine width, height and number of channels
   Image output = pyramid[0].copy();
