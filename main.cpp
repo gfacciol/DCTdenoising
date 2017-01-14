@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2015, Gabriele Facciolo <gfacciol@gmail.com>
+ * Copyright (c) 2016, Gabriele Facciolo <gfacciol@gmail.com>
+ * Copyright (c) 2016, Nicola Pierazzo <nicolapierazzo@gmail.com>
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify

@@ -31,9 +31,12 @@
 #include "Image.hpp"
 
 imgutils::Image DCTdenoising(const imgutils::Image &noisy, float sigma,
-                             int dct_size, int nthreads = 0);
+                             int dct_size, bool adaptive_aggregation = true, 
+                             int nthreads = 0);
 imgutils::Image DCTdenoisingGuided(const imgutils::Image &noisy,
                                    const imgutils::Image &guide,
-                                   float sigma, int dct_size, int nthreads = 0);
+                                   float sigma, int dct_size, 
+                                   bool adaptive_aggregation = true, 
+                                   int nthreads = 0);
 
 #endif  // DCTDENOISING_DCTDENOISING_HPP
