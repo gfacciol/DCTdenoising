@@ -126,10 +126,10 @@ pair<Image, Image> step1(const Image &noisy, float sigma, int dct_sz,
               // Hard thresholding
               if (abs(patch.freq(col, row, chan)) < HARD_THRESHOLD * sigma) {
                 patch.freq(col, row, chan) = 0.f;
-              } else {
-                wP += 1.f;    // count nonzero frequencies
               }
             }
+            // count ALL nonzero frequencies including DC
+            wP += abs(patch.freq(col, row, chan))>0.f ? 1.f : 0.f; 
           }
         }
       }
@@ -179,7 +179,7 @@ pair<Image, Image> step2(const Image &noisy, const Image &guide,
               float G = gpatch.freq(col, row, chan);
               float w = (G * G) / (G * G + sigma * sigma);
               patch.freq(col, row, chan) *= w;
-              wP += abs(patch.freq(col, row, chan));
+              wP += abs(patch.freq(col, row, chan)); // add to weights excluding DC
             }
           }
         }

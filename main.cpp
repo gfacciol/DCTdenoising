@@ -48,6 +48,8 @@ int main(int argc, char **argv) {
   const bool usage = static_cast<bool>(pick_option(&argc, argv, "h", nullptr));
   const int dct_sz = atoi(pick_option(&argc, argv, "w", "16"));
   const bool no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
+  const bool adaptive_aggregation 
+     = ! static_cast<bool>(pick_option(&argc, argv, "no_adaptive_aggregation", NULL));
   const char *second_step_guide = pick_option(&argc, argv, "2", "");
   const bool no_first_step = second_step_guide[0] != '\0';
   const float recompose_factor
@@ -59,7 +61,7 @@ int main(int argc, char **argv) {
   if (usage || argc < 2) {
     cerr << "usage: " << argv[0] << " sigma [input [output]] [-1 | -2 guide] "
          << "[-w patch_size (default 16)] [-c factor] [-n scales] "
-         << "[-single file]" << endl;
+         << "[-single file] [-no_adaptive_aggregation]" << endl;
     return usage ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
@@ -85,12 +87,12 @@ int main(int argc, char **argv) {
   for (int layer = 0; layer < scales; ++layer) {
     float s = sigma * sqrt(static_cast<float>(noisy_p[layer].pixels()) / noisy.pixels());
     if (!no_first_step) {
-      Image guide = DCTdenoising(noisy_p[layer], s, dct_sz);
+      Image guide = DCTdenoising(noisy_p[layer], s, dct_sz, adaptive_aggregation);
       guide_p.push_back(move(guide));
     }
     if (!no_second_step) {
       Image result =
-          DCTdenoisingGuided(noisy_p[layer], guide_p[layer], s, dct_sz);
+          DCTdenoisingGuided(noisy_p[layer], guide_p[layer], s, dct_sz, adaptive_aggregation);
       denoised_p.push_back(move(result));
     } else {
       denoised_p.push_back(move(guide_p[layer]));

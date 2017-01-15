@@ -2,17 +2,16 @@
 
 # ABOUT
 
-* Modified version (2016) : Nicola Pierazzo   <nicolapierazzo@gmail.com>
-* Modified version (2016) : Gabriele Facciolo <gfacciol@gmail.com>
-
-* Original Author    : Guoshen Yu <yu@cmap.polytechnique.fr>
-* Original Author    : Guillermo Sapiro <guille@umn.edu>
+* Author : Nicola Pierazzo   <nicolapierazzo@gmail.com>
+* Author : Gabriele Facciolo <gfacciol@gmail.com>
 * Copyright : (C) 2017 IPOL Image Processing On Line http://www.ipol.im/
 * Licence   : GPL v3+, see GPLv3.txt
+* Based on the 2010 implementation of DCT denoising by:
+  Guoshen Yu <yu@cmap.polytechnique.fr> and Guillermo Sapiro <guille@umn.edu>
 
 # OVERVIEW
 
-This source code provides an implementation of the DCT image denoising.
+This source code provides an implementation of the Multiscale DCT image denoising.
 
 # UNIX/LINUX/MAC USER GUIDE
 
@@ -35,16 +34,16 @@ Usage:
 mkdir build; cd build;
 cmake ..; make;
 
-3. Run DCT image denoising.
-./dctdenoising
+3. Run DCT image denoising
  
+./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 16)] 
+               [-c factor] [-n scales] [-single file] [-no_adaptive_aggregation]
+
 Example, run
-./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 16)] [-c factor] [-n scales] [-single file]
-
-./dctdenoising ../noisy.tiff 15 denoised.png
+./dctdenoising 15 ../noisy.tiff denoised.png
 
 
-Use PVFLIP (https://github.com/gfacciol/pvflip) to visualize tiff (float) images.
+To visualize tiff (float) images use PVFLIP (https://github.com/gfacciol/pvflip).
 
 
 # ABOUT THIS FILE
