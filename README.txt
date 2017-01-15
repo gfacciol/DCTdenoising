@@ -43,7 +43,8 @@ Example, run
 ./dctdenoising 15 ../noisy.tiff denoised.png
 
 
-To visualize tiff (float) images use PVFLIP (https://github.com/gfacciol/pvflip).
+To visualize tiff (float) images use PVFLIP (https://github.com/gfacciol/pvflip) 
+or ImageJ (https://imagej.nih.gov/ij/index.html)
 
 
 # ABOUT THIS FILE
