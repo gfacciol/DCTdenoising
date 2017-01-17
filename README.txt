@@ -36,8 +36,9 @@ cmake ..; make;
 
 3. Run DCT image denoising
  
-./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 16)] 
-               [-c factor] [-n scales] [-single file] [-no_adaptive_aggregation]
+./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 8)] 
+               [-c factor(.5)] [-n scales(4)] [-single output_singlescale] 
+               [-no_adaptive_aggregation]
 
 Example, run
 ./dctdenoising 15 ../noisy.tiff denoised.png

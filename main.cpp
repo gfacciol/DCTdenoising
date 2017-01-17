@@ -46,22 +46,22 @@ using std::vector;
  */
 int main(int argc, char **argv) {
   const bool usage = static_cast<bool>(pick_option(&argc, argv, "h", nullptr));
-  const int dct_sz = atoi(pick_option(&argc, argv, "w", "16"));
+  const int dct_sz = atoi(pick_option(&argc, argv, "w", "8"));
   const bool no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
   const bool adaptive_aggregation 
     = ! static_cast<bool>(pick_option(&argc, argv, "no_adaptive_aggregation", NULL));
   const char *second_step_guide = pick_option(&argc, argv, "2", "");
   const bool no_first_step = second_step_guide[0] != '\0';
   const float recompose_factor
-    = static_cast<float>(atof(pick_option(&argc, argv, "c", ".8")));
-  const int scales = atoi(pick_option(&argc, argv, "n", "5"));
+    = static_cast<float>(atof(pick_option(&argc, argv, "c", ".5")));
+  const int scales = atoi(pick_option(&argc, argv, "n", "4"));
   const char *out_single = pick_option(&argc, argv, "single", "");
 
   //! Check if there is the right call for the algorithm
   if (usage || argc < 2) {
     cerr << "usage: " << argv[0] << " sigma [input [output]] [-1 | -2 guide] "
-         << "[-w patch_size (default 16)] [-c factor] [-n scales] "
-         << "[-single file] [-no_adaptive_aggregation]" << endl;
+         << "[-w patch_size (default 8)] [-c factor(.5)] [-n scales(4)] "
+         << "[-single output_singlescale] [-no_adaptive_aggregation]" << endl;
     return usage ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
