@@ -1,8 +1,8 @@
 /*
- * Original code Copyright (c) 2010, Guoshen Yu <yu@cmap.polytechnique.fr>,
- *                                   Guillermo Sapiro <guille@umn.edu>
- * Modified code Copyright (c) 2015, Gabriele Facciolo <gfacciol@gmail.com>
- * Modified code Copyright (c) 2016, Nicola Pierazzo <nicolapierazzo@gmail.com>
+ * Code Copyright (c) 2017, Nicola Pierazzo <nicolapierazzo@gmail.com>,
+ *                          Gabriele Facciolo <gfacciol@gmail.com>
+ * Based on the 2010 article by Guoshen Yu <yu@cmap.polytechnique.fr>,
+ *                              Guillermo Sapiro <guille@umn.edu>
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -20,13 +20,11 @@
  */
 
 
-/*--------------------------- DCTdenoising  -------------------------*/
-// This code implements "DCT image denoising: a simple and effective image
-// denoising algorithm".
-// http://www.ipol.im/pub/algo/ys_dct_denoising
-// Copyright, Guoshen Yu, Guillermo Sapiro, 2010.
-// Please report bugs and/or send comments to Guoshen Yu
-// yu@cmap.polytechnique.fr
+/*-----------------------  Multiscale DCTdenoising  -------------------------*/
+// This code implements "Multiscale DCT denoising".
+// http://www.ipol.im/pub/art/2017/201 
+// Copyright, Nicola Pierazzo, Gabriele Facciolo, 2017.
+// Please report bugs and/or send comments to G. Facciolo gfacciol@gmail.com
 /*---------------------------------------------------------------------------*/
 
 

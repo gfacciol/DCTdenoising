@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2016, Gabriele Facciolo <gfacciol@gmail.com>
- * Copyright (c) 2016, Nicola Pierazzo <nicolapierazzo@gmail.com>
+ *                     Nicola Pierazzo <nicolapierazzo@gmail.com>
  * All rights reserved.
  *
  * This program is free software: you can redistribute it and/or modify
@@ -49,11 +49,11 @@ int main(int argc, char **argv) {
   const int dct_sz = atoi(pick_option(&argc, argv, "w", "16"));
   const bool no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
   const bool adaptive_aggregation 
-     = ! static_cast<bool>(pick_option(&argc, argv, "no_adaptive_aggregation", NULL));
+    = ! static_cast<bool>(pick_option(&argc, argv, "no_adaptive_aggregation", NULL));
   const char *second_step_guide = pick_option(&argc, argv, "2", "");
   const bool no_first_step = second_step_guide[0] != '\0';
   const float recompose_factor
-      = static_cast<float>(atof(pick_option(&argc, argv, "c", ".8")));
+    = static_cast<float>(atof(pick_option(&argc, argv, "c", ".8")));
   const int scales = atoi(pick_option(&argc, argv, "n", "5"));
   const char *out_single = pick_option(&argc, argv, "single", "");
 
