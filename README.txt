@@ -31,17 +31,23 @@ Usage:
 1. Download the code package and extract it. Go to that directory. 
 
 2. Compile the source code (on Unix/Linux/Mac OS). 
-mkdir build; cd build;
-cmake ..; make;
 
-3. Run DCT image denoising
+    mkdir build; cd build;
+    cmake ..; make;
+
+3. Runing DCT image denoising: parameters
  
-./dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 8)] 
-               [-c factor(.5)] [-n scales(4)] [-single output_singlescale] 
-               [-no_adaptive_aggregation]
+    ./dctdenoising sigma [input [output]]   # noise std, noisy image, output
+       [-w patch_size (default 8)]   # DCT denoising patch size
+       [-1 | -2 guide]               # -1: only hard thresh., -2: provide guide
+       [-no_adaptive_aggregation]    # disable adaptive weighted aggregation
+       [-n scales(4)]                # multiscale: number of scales
+       [-c factor(.5)]               # multiscale: recomposition factor
+       [-single output_singlescale]  # multiscale: save also one-scale result
 
 Example, run
-./dctdenoising 15 ../noisy.tiff denoised.png
+
+    ./dctdenoising 15 ../noisy.tiff denoised.png
 
 
 To visualize tiff (float) images use PVFLIP (https://github.com/gfacciol/pvflip) 

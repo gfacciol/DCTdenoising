@@ -25,21 +25,39 @@ inline int SymmetricCoordinate(int pos, int size) {
   return pos;
 }
 
-pair<int, int> ComputeTiling(int rows, int columns, int tiles) {
-  float best_r = sqrt(static_cast<float>(tiles * rows) / columns);
+/*! \brief Compute best tiling of image in at most ntiles
+ *
+ *  Returns the pair: rows, columns
+ */
+pair<int, int> ComputeTiling(int rows, int columns, int ntiles) {
+  // The objective is extract ntiles square-ish tiles
+  // For a square image the optimal number of rows is sqrt(ntiles)
+  // The ratio rows/columns permits to handle rectangular images
+  float best_r = sqrt(static_cast<float>(ntiles * rows) / columns);
   int r_low = static_cast<int>(best_r);
   int r_up = r_low + 1;
-  if (r_low < 1) return {1, tiles};
-  if (r_up > tiles) return {tiles, 1};
-  while (tiles % r_low != 0) --r_low;
-  while (tiles % r_up != 0) ++r_up;
-  if (r_up * r_low * columns > tiles * rows) {
-    return {r_low, tiles / r_low};
+  if (r_low < 1) return {1, ntiles};      // single row
+  if (r_up > ntiles) return {ntiles, 1};  // single column
+  // look for the nearest integer divisors of ntiles
+  while (ntiles % r_low != 0) --r_low;
+  while (ntiles % r_up != 0) ++r_up;
+  // this criterion selects between r_low and r_up rows
+  // if   r_up * r_low > best_r^2
+  // then r_up is too large so r_low is selected
+  // else r_low is too small and r_up is selected
+  if (r_up * r_low * columns > ntiles * rows) {
+    return {r_low, ntiles / r_low};
   } else {
-    return {r_up, tiles / r_up};
+    return {r_up, ntiles / r_up};
   }
 }
 
+/*! \brief Split image in tiles
+ *
+ *  Returns a vector containing tiling.first x tiling.sencond images
+ *  each padded by pad_* pixels. Tiles are stored in lexicographic order.
+ *  Padding outside the image is done by symmetrization
+ */
 vector<Image> SplitTiles(const Image &src, int pad_before, int pad_after,
                          pair<int, int> tiling) {
   vector<Image> result;
@@ -49,6 +67,7 @@ vector<Image> SplitTiles(const Image &src, int pad_before, int pad_after,
     for (int tc = 0; tc < tiling.second; ++tc) {
       int cstart = src.columns() * tc / tiling.second - pad_before;
       int cend = src.columns() * (tc + 1) / tiling.second + pad_after;
+      // copy image to tile using the above computed limits
       Image tile(rend - rstart, cend - cstart, src.channels());
       for (int ch = 0; ch < src.channels(); ++ch) {
         for (int row = rstart; row < rend; ++row) {
@@ -66,6 +85,11 @@ vector<Image> SplitTiles(const Image &src, int pad_before, int pad_after,
   return result;
 }
 
+/*! \brief Recompose tiles produced by SplitTiles
+ *
+ *  Returns an image resulting of recomposing the tiling
+ *  padded margins are averaged in the result
+ */
 Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
                  int pad_before, int pad_after, pair<int, int> tiling) {
   int channels = src[0].first.channels();
@@ -78,6 +102,7 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
     for (int tc = 0; tc < tiling.second; ++tc) {
       int cstart = shape.second * tc / tiling.second - pad_before;
       int cend = shape.second * (tc + 1) / tiling.second + pad_after;
+      // copy tile to image using the above computed limits
       for (int ch = 0; ch < channels; ++ch) {
         for (int row = max(0, rstart); row < min(shape.first, rend); ++row) {
           for (int col = max(0, cstart); col < min(shape.second, cend); ++col) {
@@ -86,6 +111,7 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
           }
         }
       }
+      // image weight due to the padding
       for (int row = max(0, rstart); row < min(shape.first, rend); ++row) {
         for (int col = max(0, cstart); col < min(shape.second, cend); ++col) {
           weights.val(col, row) += tile->second.val(col - cstart, row - rstart);
@@ -94,6 +120,7 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
       ++tile;
     }
   }
+  // normalize by the weight
   for (int ch = 0; ch < channels; ++ch) {
     for (int row = 0; row < shape.first; ++row) {
       for (int col = 0; col < shape.second; ++col) {
@@ -104,6 +131,10 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
   return result;
 }
 
+/*! \brief 2D DCT transform of image (channel-wise)
+ *
+ * Operates over the img in-place
+ */
 void dct_inplace(Image &img) {
   int n[] = {img.rows(), img.columns()};
   fftwf_r2r_kind dct2[] = {FFTW_REDFT10, FFTW_REDFT10};
@@ -119,6 +150,10 @@ void dct_inplace(Image &img) {
   }
 }
 
+/*! \brief 2D inverse DCT transform of image (channel-wise)
+ *
+ * Operates over the img in-place
+ */
 void idct_inplace(Image &img) {
   int n[] = {img.rows(), img.columns()};
   fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
@@ -130,7 +165,7 @@ void idct_inplace(Image &img) {
 }
 
 /*! \brief Dyadic DCT pyramid decomposition.
- *  
+ *
  *  Returns a vector containing #levels images
  */
 vector<Image> decompose(const Image &img, int levels) {
@@ -158,7 +193,7 @@ vector<Image> decompose(const Image &img, int levels) {
 }
 
 /*! \brief Dyadic DCT pyramid conservative recomposition.
- *  
+ *
  *  Takes a vector containing the layers of the pyramid. Computes
  *  the transform of each layer and recomposes the frequencies in a 
  *  fine-to-coarse fashion, copying into the final result only the 
