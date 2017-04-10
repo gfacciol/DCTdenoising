@@ -215,11 +215,11 @@ Image DCTdenoising(const Image &noisy, float sigma, int dct_sz,
   nthreads = 1;
 #endif  // _OPENMP
 
-  int r = dct_sz / 2 - 1;
+  int r = dct_sz / 2; // half patch size for the padding 
   pair<int, int> tiling = ComputeTiling(noisy.rows(), noisy.columns(),
                                         nthreads);
   vector<Image> noisy_tiles = SplitTiles(ColorTransform(noisy.copy()), r,
-                                         dct_sz - r - 1, tiling);
+                                         dct_sz - r, tiling);
   vector<pair<Image, Image>> result_tiles(nthreads);
 
 #pragma omp parallel for num_threads(nthreads)
@@ -229,7 +229,7 @@ Image DCTdenoising(const Image &noisy, float sigma, int dct_sz,
   }
 
   return ColorTransformInverse(MergeTiles(result_tiles, noisy.shape(), r,
-                                          dct_sz - r - 1, tiling));
+                                          dct_sz - r, tiling));
 }
 
 // Denoise an image with sliding DCT thresholding.
@@ -241,13 +241,13 @@ Image DCTdenoisingGuided(const Image &noisy, const Image &guide, float sigma,
   nthreads = 1;
 #endif  // _OPENMP
 
-  int r = dct_sz / 2;
+  int r = dct_sz / 2; // half patch size for the padding
   pair<int, int> tiling = ComputeTiling(noisy.rows(), noisy.columns(),
                                         nthreads);
   vector<Image> noisy_tiles = SplitTiles(ColorTransform(noisy.copy()), r,
-                                         dct_sz - r - 1, tiling);
+                                         dct_sz - r, tiling);
   vector<Image> guide_tiles = SplitTiles(ColorTransform(guide.copy()), r,
-                                         dct_sz - r - 1, tiling);
+                                         dct_sz - r, tiling);
   vector<pair<Image, Image>> result_tiles(nthreads);
 
 #pragma omp parallel for num_threads(nthreads)
@@ -257,5 +257,5 @@ Image DCTdenoisingGuided(const Image &noisy, const Image &guide, float sigma,
   }
 
   return ColorTransformInverse(MergeTiles(result_tiles, noisy.shape(), r,
-                                          dct_sz - r - 1, tiling));
+                                          dct_sz - r, tiling));
 }
