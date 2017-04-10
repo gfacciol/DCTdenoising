@@ -67,6 +67,8 @@ set(SOURCE_FILES
     Image.hpp
     utils.cpp
     utils.hpp
+    demoutils.cpp
+    demoutils.hpp
 )
 
 set_property(SOURCE iio.c PROPERTY COMPILE_FLAGS "-Wno-unused-variable -Wno-unused-parameter -Wno-pointer-sign -Wno-parentheses -Wno-deprecated-declarations -Wno-unused-function")

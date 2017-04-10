@@ -27,6 +27,7 @@
 
 #include "DCTdenoising.h"
 #include "utils.hpp"
+#include "demoutils.hpp"
 
 using imgutils::pick_option;
 using imgutils::read_image;
@@ -45,17 +46,19 @@ using std::vector;
  * @author Nicola Pierazzo
  */
 int main(int argc, char **argv) {
-  const bool usage = static_cast<bool>(pick_option(&argc, argv, "h", nullptr));
-  const int dct_sz = atoi(pick_option(&argc, argv, "w", "8"));
-  const bool no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
-  const bool adaptive_aggregation 
+  // read DCT denoising options
+  const bool  usage = static_cast<bool>(pick_option(&argc, argv, "h", nullptr));
+  const int   dct_sz = atoi(pick_option(&argc, argv, "w", "8"));
+  const char  *second_step_guide = pick_option(&argc, argv, "2", "");
+  const bool  no_second_step = static_cast<bool>(pick_option(&argc, argv, "1", NULL));
+  const bool  no_first_step = second_step_guide[0] != '\0';
+  const bool  adaptive_aggregation 
     = ! static_cast<bool>(pick_option(&argc, argv, "no_adaptive_aggregation", NULL));
-  const char *second_step_guide = pick_option(&argc, argv, "2", "");
-  const bool no_first_step = second_step_guide[0] != '\0';
+  // read multiscaler options
+  const char  *out_single = pick_option(&argc, argv, "single", "");
+  const int   scales = atoi(pick_option(&argc, argv, "n", "4"));
   const float recompose_factor
     = static_cast<float>(atof(pick_option(&argc, argv, "c", ".5")));
-  const int scales = atoi(pick_option(&argc, argv, "n", "4"));
-  const char *out_single = pick_option(&argc, argv, "single", "");
 
   //! Check if there is the right call for the algorithm
   if (usage || argc < 2) {
@@ -75,8 +78,10 @@ int main(int argc, char **argv) {
        " thread." << endl;
 #endif
 
+  // read input
   Image noisy = read_image(argc > 2 ? argv[2] : "-");
   const float sigma = static_cast<float>(atof(argv[1]));
+  // generate the DCT pyramid 
   vector<Image> noisy_p = decompose(noisy, scales);
   vector<Image> guide_p, denoised_p;
   if (no_first_step) {
@@ -84,7 +89,9 @@ int main(int argc, char **argv) {
     guide_p = decompose(guide, scales);
   }
 
+  // apply DCT denoising at each scale of the pyramid
   for (int layer = 0; layer < scales; ++layer) {
+    // noise at the current scale is proportional to the number of pixels
     float s = sigma * sqrt(static_cast<float>(noisy_p[layer].pixels()) / noisy.pixels());
     if (!no_first_step) {
       Image guide = DCTdenoising(noisy_p[layer], s, dct_sz, adaptive_aggregation);
@@ -99,6 +106,7 @@ int main(int argc, char **argv) {
     }
   }
 
+  // recompose pyramid
   if (strlen(out_single)) save_image(denoised_p[0], out_single);
   Image result = recompose(denoised_p, recompose_factor);
 
