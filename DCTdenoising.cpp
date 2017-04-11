@@ -135,26 +135,22 @@ inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
       if (guided) {
         ExtractPatch(guide, pr, pc, &gpatch);
         gpatch.ToFreq();
-        for (int chan = 0; chan < noisy.channels(); ++chan) {
-          for (int row = 0; row < dct_sz; ++row) {
-            for (int col = 0; col < dct_sz; ++col) {
+      }
+
+      for (int chan = 0; chan < noisy.channels(); ++chan) {
+        for (int row = 0; row < dct_sz; ++row) {
+          for (int col = 0; col < dct_sz; ++col) {
+
+            if (guided) {   // Wiener filtering with oracle guide
               if (row || col) {
-                // Wiener filtering with oracle guide
                 float G = gpatch.freq(col, row, chan);
                 float w = (G * G) / (G * G + sigma * sigma);
                 patch.freq(col, row, chan) *= w;
                   // add to weights excluding DC
                 wP += abs(patch.freq(col, row, chan));
               }
-            }
-          }
-        }
-      } else { // case: not guided
-        for (int chan = 0; chan < noisy.channels(); ++chan) {
-          for (int row = 0; row < dct_sz; ++row) {
-            for (int col = 0; col < dct_sz; ++col) {
+            } else {        // Hard thresholding
               if (row || col) {
-                // Hard thresholding
                 if (abs(patch.freq(col, row, chan)) < HARD_THRESHOLD * sigma) {
                   patch.freq(col, row, chan) = 0.f;
                 }
@@ -162,6 +158,7 @@ inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
               // count ALL nonzero frequencies including DC
               wP += abs(patch.freq(col, row, chan))>0.f ? 1.f : 0.f;
             }
+
           }
         }
       }
