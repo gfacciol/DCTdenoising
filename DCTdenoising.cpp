@@ -22,7 +22,7 @@
 
 /*-----------------------  Multiscale DCTdenoising  -------------------------*/
 // This code implements "Multiscale DCT denoising".
-// http://www.ipol.im/pub/art/2017/201 
+// http://www.ipol.im/pub/art/2017/201
 // Copyright, Nicola Pierazzo, Gabriele Facciolo, 2017.
 // Please report bugs and/or send comments to G. Facciolo gfacciol@gmail.com
 /*---------------------------------------------------------------------------*/
@@ -92,13 +92,15 @@ Image ColorTransformInverse(Image &&src) {
   return img;
 }
 
-void ExtractPatch(const Image &src, int pr, int pc, DCTPatch *dst) {
+inline void ExtractPatch(const Image &src, int pr, int pc, DCTPatch *dst) {
   // src is padded, so (pr, pc) becomes the upper left pixel
   for (int chan = 0; chan < dst->channels(); ++chan) {
     for (int row = 0; row < dst->rows(); ++row) {
-//      for (int col = 0; col < dst->columns(); ++col) {
-//        dst->space(col, row, chan) = src.val(pc + col, pr + row, chan);
-//      }
+      // // the following line copies a line interval to the patch and
+      // // is equivalent toi (but faster):
+      //   for (int col = 0; col < dst->columns(); ++col) {
+      //     dst->space(col, row, chan) = src.val(pc + col, pr + row, chan);
+      //   }
       copy(&(src.val(pc, pr + row, chan)),
            &src.val(pc + dst->columns(), pr + row, chan),
            &dst->space(0, row, chan));
@@ -106,89 +108,72 @@ void ExtractPatch(const Image &src, int pr, int pc, DCTPatch *dst) {
   }
 }
 
-pair<Image, Image> step1(const Image &noisy, float sigma, int dct_sz,
-                         bool adaptive_aggregation) {
+/*! \brief DCT denoising steps: Hard thresholding and Wiener
+ *
+ * This funciton implemets both steps, when guided==false the hard
+ * thresholding step is applied and the guide image is ignored.
+ * Otherwise the Wiener filtering step is applied using guide as oracle.
+ * Returns a pair containing the aggregated patches and weights
+ *
+ * Functions step1, and step2 provide an alternative interface to this one.
+ */
+inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
+                         const float sigma, const int dct_sz,
+                         bool adaptive_aggregation, const bool guided) {
   Image result(noisy.rows(), noisy.columns(), noisy.channels());
   Image weights(noisy.rows(), noisy.columns());
 
   DCTPatch patch(dct_sz, dct_sz, noisy.channels());
+  DCTPatch gpatch(dct_sz, dct_sz, noisy.channels()); // unused if !guided
   for (int pr = 0; pr <= noisy.rows() - dct_sz; ++pr) {
     for (int pc = 0; pc <= noisy.columns() - dct_sz; ++pc) {
+      // starts processing of a single patch
+      float wP = 0; // adaptive aggregation weight
       ExtractPatch(noisy, pr, pc, &patch);
       patch.ToFreq();
-      float wP = 0; // adaptive aggregation weight
-      for (int chan = 0; chan < noisy.channels(); ++chan) {
-        for (int row = 0; row < dct_sz; ++row) {
-          for (int col = 0; col < dct_sz; ++col) {
-            if (row || col) {
-              // Hard thresholding
-              if (abs(patch.freq(col, row, chan)) < HARD_THRESHOLD * sigma) {
-                patch.freq(col, row, chan) = 0.f;
+
+      if (guided) {
+        ExtractPatch(guide, pr, pc, &gpatch);
+        gpatch.ToFreq();
+        for (int chan = 0; chan < noisy.channels(); ++chan) {
+          for (int row = 0; row < dct_sz; ++row) {
+            for (int col = 0; col < dct_sz; ++col) {
+              if (row || col) {
+                // Wiener filtering with oracle guide
+                float G = gpatch.freq(col, row, chan);
+                float w = (G * G) / (G * G + sigma * sigma);
+                patch.freq(col, row, chan) *= w;
+                  // add to weights excluding DC
+                wP += abs(patch.freq(col, row, chan));
               }
             }
-            // count ALL nonzero frequencies including DC
-            wP += abs(patch.freq(col, row, chan))>0.f ? 1.f : 0.f; 
           }
         }
-      }
-      patch.ToSpace();
-      wP = wP>=1 ? 1.f/wP : 1.f;
-      if (!adaptive_aggregation)
-         wP = 1.f;
-
-      // Aggregation
-      for (int ch = 0; ch < noisy.channels(); ++ch) {
-        for (int row = 0; row < dct_sz; ++row) {
-          for (int col = 0; col < dct_sz; ++col) {
-            result.val(col + pc, row + pr, ch) += patch.space(col, row, ch)*wP;
-          }
-        }
-      }
-      for (int row = 0; row < dct_sz; ++row) {
-        for (int col = 0; col < dct_sz; ++col) {
-          weights.val(col + pc, row + pr) += 1.f*wP;
-        }
-      }
-    }
-  }
-  return {move(result), move(weights)};
-}
-
-pair<Image, Image> step2(const Image &noisy, const Image &guide,
-                         const float sigma, const int dct_sz,
-                         bool adaptive_aggregation) {
-  Image result(noisy.rows(), noisy.columns(), noisy.channels());
-  Image weights(noisy.rows(), noisy.columns());
-
-  DCTPatch patch(dct_sz, dct_sz, noisy.channels());
-  DCTPatch gpatch(dct_sz, dct_sz, noisy.channels());
-  for (int pr = 0; pr <= noisy.rows() - dct_sz; ++pr) {
-    for (int pc = 0; pc <= noisy.columns() - dct_sz; ++pc) {
-      ExtractPatch(noisy, pr, pc, &patch);
-      ExtractPatch(guide, pr, pc, &gpatch);
-      patch.ToFreq();
-      gpatch.ToFreq();
-      float wP = 0; // adaptive aggregation weight
-      for (int chan = 0; chan < noisy.channels(); ++chan) {
-        for (int row = 0; row < dct_sz; ++row) {
-          for (int col = 0; col < dct_sz; ++col) {
-            if (row || col) {
-              // Wiener
-              float G = gpatch.freq(col, row, chan);
-              float w = (G * G) / (G * G + sigma * sigma);
-              patch.freq(col, row, chan) *= w;
-              wP += abs(patch.freq(col, row, chan)); // add to weights excluding DC
+      } else { // case: not guided
+        for (int chan = 0; chan < noisy.channels(); ++chan) {
+          for (int row = 0; row < dct_sz; ++row) {
+            for (int col = 0; col < dct_sz; ++col) {
+              if (row || col) {
+                // Hard thresholding
+                if (abs(patch.freq(col, row, chan)) < HARD_THRESHOLD * sigma) {
+                  patch.freq(col, row, chan) = 0.f;
+                }
+              }
+              // count ALL nonzero frequencies including DC
+              wP += abs(patch.freq(col, row, chan))>0.f ? 1.f : 0.f;
             }
           }
         }
       }
+
       patch.ToSpace();
 
+      // this test also means wP>=1 for integer wP as in !guided
       wP = wP>=1e-6 ? 1.f/wP : 1.f;
       if (!adaptive_aggregation)
          wP = 1.f;
 
-      // Aggregation
+      // Aggregation of the patch
       for (int ch = 0; ch < noisy.channels(); ++ch) {
         for (int row = 0; row < dct_sz; ++row) {
           for (int col = 0; col < dct_sz; ++col) {
@@ -206,35 +191,38 @@ pair<Image, Image> step2(const Image &noisy, const Image &guide,
   return {move(result), move(weights)};
 }
 
-// Denoise an image with sliding DCT thresholding.
-Image DCTdenoising(const Image &noisy, float sigma, int dct_sz, 
-                   bool adaptive_aggregation, int nthreads) {
-#ifdef _OPENMP
-  if (!nthreads) nthreads = omp_get_max_threads();  // number of threads
-#else
-  nthreads = 1;
-#endif  // _OPENMP
-
-  int r = dct_sz / 2; // half patch size for the padding 
-  pair<int, int> tiling = ComputeTiling(noisy.rows(), noisy.columns(),
-                                        nthreads);
-  vector<Image> noisy_tiles = SplitTiles(ColorTransform(noisy.copy()), r,
-                                         dct_sz - r, tiling);
-  vector<pair<Image, Image>> result_tiles(nthreads);
-
-#pragma omp parallel for num_threads(nthreads)
-  for (int i = 0; i < nthreads; ++i) {
-    result_tiles[i] = step1(noisy_tiles[i], sigma, dct_sz,
-                            adaptive_aggregation);
-  }
-
-  return ColorTransformInverse(MergeTiles(result_tiles, noisy.shape(), r,
-                                          dct_sz - r, tiling));
+/*! \brief wrapper for DCTsteps in case of Hard thresholding
+ *
+ * Returns a pair containing the aggregated patches and weights
+ */
+inline pair<Image, Image> step1(const Image &noisy,
+                         const float sigma, const int dct_sz,
+                         bool adaptive_aggregation) {
+  Image dummyguide; // dummy guide
+  return DCTsteps(noisy, dummyguide, sigma, dct_sz, adaptive_aggregation, false);
 }
 
-// Denoise an image with sliding DCT thresholding.
-Image DCTdenoisingGuided(const Image &noisy, const Image &guide, float sigma,
-                   int dct_sz, bool adaptive_aggregation, int nthreads) {
+/*! \brief wrapper for DCTsteps in case of Wiener filtering
+ *
+ * Returns a pair containing the aggregated patches and weights
+ */
+inline pair<Image, Image> step2(const Image &noisy, const Image &guide,
+                         const float sigma, const int dct_sz,
+                         bool adaptive_aggregation) {
+  return DCTsteps(noisy, guide, sigma, dct_sz, adaptive_aggregation, true);
+}
+
+
+
+/*! \brief Denoise an image with sliding window DCT denoising
+ *
+ * If guided==false, then guide is ignored and hard thresholding is applied,
+ * otherwise Wiener filtering is applied using guide as oracle.
+ * Returns a denoised image
+ */
+inline Image DCTdenoisingBoth(const Image &noisy, const Image &guide, float sigma,
+                       int dct_sz, bool adaptive_aggregation,
+                       const bool guided, int nthreads) {
 #ifdef _OPENMP
   if (!nthreads) nthreads = omp_get_max_threads();  // number of threads
 #else
@@ -242,20 +230,54 @@ Image DCTdenoisingGuided(const Image &noisy, const Image &guide, float sigma,
 #endif  // _OPENMP
 
   int r = dct_sz / 2; // half patch size for the padding
+  // compute tiling parameters
   pair<int, int> tiling = ComputeTiling(noisy.rows(), noisy.columns(),
                                         nthreads);
-  vector<Image> noisy_tiles = SplitTiles(ColorTransform(noisy.copy()), r,
-                                         dct_sz - r, tiling);
-  vector<Image> guide_tiles = SplitTiles(ColorTransform(guide.copy()), r,
-                                         dct_sz - r, tiling);
+  // prepare image tiles
+  vector<Image> noisy_tiles, guide_tiles;
+  noisy_tiles = SplitTiles(ColorTransform(noisy.copy()),
+                           r, dct_sz - r, tiling);
+  if (guided) {
+    guide_tiles = SplitTiles(ColorTransform(guide.copy()),
+                             r, dct_sz - r, tiling);
+  }
   vector<pair<Image, Image>> result_tiles(nthreads);
 
-#pragma omp parallel for num_threads(nthreads)
+  // parallel-process the tiles
+  #pragma omp parallel for num_threads(nthreads)
   for (int i = 0; i < nthreads; ++i) {
-    result_tiles[i] = step2(noisy_tiles[i], guide_tiles[i], sigma, dct_sz,
-                            adaptive_aggregation);
+    if (guided) { // Wiener filtering
+      result_tiles[i] = step2(noisy_tiles[i], guide_tiles[i],
+                              sigma, dct_sz, adaptive_aggregation);
+    } else {      // Hard thresholding
+      result_tiles[i] = step1(noisy_tiles[i],
+                              sigma, dct_sz, adaptive_aggregation);
+    }
   }
 
+  // combine tiles and invert color transform
   return ColorTransformInverse(MergeTiles(result_tiles, noisy.shape(), r,
                                           dct_sz - r, tiling));
 }
+
+/*! \brief wrapper for DCTdenoisingBoth: Wiener filtering case (guided)
+ *
+ * Returns the denoised image
+ */
+Image DCTdenoisingGuided(const Image &noisy, const Image &guide, float sigma,
+                         int dct_sz, bool adaptive_aggregation, int nthreads) {
+  return DCTdenoisingBoth(noisy, guide, sigma, dct_sz,
+                          adaptive_aggregation, true, nthreads);
+}
+
+/*! \brief wrapper for DCTdenoisingBoth: Hard thresholding case
+ *
+ * Returns the denoised image
+ */
+Image DCTdenoising(const Image &noisy, float sigma,
+                   int dct_sz, bool adaptive_aggregation, int nthreads) {
+  Image dummyguide;
+  return DCTdenoisingBoth(noisy, dummyguide, sigma, dct_sz,
+                          adaptive_aggregation, false, nthreads);
+}
+
