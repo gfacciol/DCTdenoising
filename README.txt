@@ -40,10 +40,18 @@ Usage:
     ./dctdenoising sigma [input [output]]   # noise std, noisy image, output
        [-w patch_size (default 8)]   # DCT denoising patch size
        [-1 | -2 guide]               # -1: only hard thresh., -2: provide guide
-       [-no_adaptive_aggregation]    # disable adaptive weighted aggregation
+       [-no_adaptive_aggregation]    # disable adaptive aggregation weights
        [-n scales(4)]                # multiscale: number of scales
        [-c factor(.5)]               # multiscale: recomposition factor
        [-single output_singlescale]  # multiscale: save also one-scale result
+
+
+The flag -1 permits to run DCT denoising only with the hard thresholding step,
+while -2 allows to specify the guide for the wiener filtering step.
+When not set both steps are executed using the output of the first one as guide
+for the second one.
+Setting no_adaptive_aggregation disables the aggregation weights.
+
 
 Example, run
 

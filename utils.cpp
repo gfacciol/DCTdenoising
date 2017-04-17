@@ -134,6 +134,7 @@ Image MergeTiles(const vector<pair<Image, Image>> &src, pair<int, int> shape,
 /*! \brief 2D DCT transform of image (channel-wise)
  *
  * Operates over the img in-place
+ * Computes the normalized but not orthogonal 2D DCT
  */
 void dct_inplace(Image &img) {
   int n[] = {img.rows(), img.columns()};

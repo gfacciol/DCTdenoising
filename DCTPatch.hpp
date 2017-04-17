@@ -14,6 +14,11 @@
 
 namespace imgutils {
 
+/*! \brief DCTPatch object
+ *
+ *  DCTPatch contains a patch and its DCT transform,
+ *  and allows to convert back and forth between the two
+ */
 class DCTPatch {
  public:
   DCTPatch(int rows, int columns, int channels = 1);
@@ -45,6 +50,11 @@ class DCTPatch {
   const float norm_factor_;
 };
 
+ 
+/*! \brief Access the spatial representation of the patch
+ *
+ *  Returns pixel value
+ */
 inline float& DCTPatch::space(int col, int row, int chan) {
   assert(0 <= col && col < columns_);
   assert(0 <= row && row < rows_);
@@ -52,6 +62,10 @@ inline float& DCTPatch::space(int col, int row, int chan) {
   return space_[chan * rows_ * columns_ + row * columns_ + col];
 }
 
+/*! \brief Access the DCT representation of the patch
+ *
+ *  Returns freq coefficient
+ */
 inline float& DCTPatch::freq(int col, int row, int chan) {
   assert(0 <= col && col < columns_);
   assert(0 <= row && row < rows_);
@@ -88,6 +102,9 @@ inline DCTPatch::~DCTPatch() {
   fftwf_destroy_plan(plan_backward_);
 }
 
+
+/*! \brief Computes the isometric DCT(Type2) of space, stores result in freq
+ */
 inline void DCTPatch::ToFreq() {
   fftwf_execute(plan_forward_);
   for (int ch = 0; ch < channels_; ++ch) {
@@ -103,6 +120,8 @@ inline void DCTPatch::ToFreq() {
   }
 }
 
+/*! \brief Computes the isometric iDCT(Type3) of freq, stores result in space
+ */
 inline void DCTPatch::ToSpace() {
   for (int ch = 0; ch < channels_; ++ch) {
     for (int row = 0; row < rows_; ++row) {
