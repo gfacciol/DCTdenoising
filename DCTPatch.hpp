@@ -107,6 +107,7 @@ inline DCTPatch::~DCTPatch() {
  */
 inline void DCTPatch::ToFreq() {
   fftwf_execute(plan_forward_);
+  // normalize coefficients
   for (int ch = 0; ch < channels_; ++ch) {
     for (int row = 0; row < rows_; ++row) {
       freq(0, row, ch) /= sqrt(2.f);
@@ -123,6 +124,7 @@ inline void DCTPatch::ToFreq() {
 /*! \brief Computes the isometric iDCT(Type3) of freq, stores result in space
  */
 inline void DCTPatch::ToSpace() {
+  // normalize coefficients 
   for (int ch = 0; ch < channels_; ++ch) {
     for (int row = 0; row < rows_; ++row) {
       freq(0, row, ch) *= sqrt(2.f);
