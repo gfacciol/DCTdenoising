@@ -153,10 +153,11 @@ inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
               if (row || col) {
                 if (abs(patch.freq(col, row, chan)) < HARD_THRESHOLD * sigma) {
                   patch.freq(col, row, chan) = 0.f;
+                } else { // count ALL nonzero frequencies excluding DC
+                  wP++;
                 }
               }
-              // count ALL nonzero frequencies including DC
-              wP += abs(patch.freq(col, row, chan))>0.f ? 1.f : 0.f;
+              
             }
 
           }
@@ -165,8 +166,7 @@ inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
 
       patch.ToSpace();
 
-      // this test also means wP>=1 for integer wP as in !guided
-      wP = wP>=1e-6 ? 1.f/wP : 1.f;
+      wP = 1.f/(1.f + wP);
       if (!adaptive_aggregation)
          wP = 1.f;
 
