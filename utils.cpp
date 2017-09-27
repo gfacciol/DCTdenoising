@@ -160,10 +160,26 @@ void dct_inplace(Image &img) {
   fftwf_execute(plan);
   fftwf_destroy_plan(plan);
 
-  // Normalization
-  for (int i = 0; i < img.samples(); ++i) {
-    img.val(i) /= 4 * img.pixels();
+  ////> isometric normalization
+  // this normalization (and scaling) affects several other functions: 
+  //     idct_inplace, decompose, recompose
+  // but they can all be removed only by applying the Normalization below 
+  double norm_factor = sqrt(.25f / (img.rows() * img.columns()));
+  for (int ch = 0; ch < img.channels(); ++ch) {
+    for (int row = 0; row < img.rows(); ++row) {
+      img.val(0, row, ch) /= sqrt(2.f);
+      for (int col = 0; col < img.columns(); ++col) {
+        img.val(col, row, ch) *= norm_factor;
+      }
+    }
+    for (int col = 0; col < img.columns(); ++col) {
+      img.val(col, 0, ch) /= sqrt(2.f);
+    }
   }
+  ////> Normalization
+  //for (int i = 0; i < img.samples(); ++i) {
+  //  img.val(i) /= 4 * img.pixels();
+  //}
 }
 
 /*! \brief 2D inverse DCT transform of image (channel-wise)
@@ -171,6 +187,20 @@ void dct_inplace(Image &img) {
  * Operates over the img in-place
  */
 void idct_inplace(Image &img) {
+  ////> isometric normalization
+  long double norm_factor = sqrt(.25f / (img.rows() * img.columns()));
+  for (int ch = 0; ch < img.channels(); ++ch) {
+    for (int row = 0; row < img.rows(); ++row) {
+      img.val(0, row, ch) *= sqrt(2.f);
+      for (int col = 0; col < img.columns(); ++col) {
+        img.val(col, row, ch) *= norm_factor;
+      }
+    }
+    for (int col = 0; col < img.columns(); ++col) {
+      img.val(col, 0, ch) *= sqrt(2.f);
+    }
+  }
+
   int n[] = {img.rows(), img.columns()};
   fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
   fftwf_plan plan = fftwf_plan_many_r2r(2, n, img.channels(), img.data(), NULL,
@@ -192,10 +222,12 @@ vector<Image> decompose(const Image &img, int levels) {
   for (int i = 0; i < levels; ++i) {
     // Copy data
     Image layer(h, w, freq.channels());
+    ////> isometric normalization scaling
+    double scaling = std::sqrt((double)(w*h)/((double)(img.rows()*img.columns())));
     for (int ch = 0; ch < freq.channels(); ++ch) {
       for (int r = 0; r < h; ++r) {
         for (int c = 0; c < w; ++c) {
-          layer.val(c, r, ch) = freq.val(c, r, ch);
+          layer.val(c, r, ch) = freq.val(c, r, ch) * scaling;
         }
       }
     }
@@ -227,11 +259,13 @@ Image recompose(const vector<Image> &pyramid, float recompose_factor) {
     Image layer = pyramid[i].copy();
     // Perform the DCT
     dct_inplace(layer);
+    ////> isometric normalization scaling
+    double scaling = std::sqrt((double)(output.rows()*output.columns())/((double)(layer.rows()*layer.columns())));
     // Copy data (selected by recompose_factor)
     for (int ch = 0; ch < layer.channels(); ++ch) {
       for (int r = 0; r < layer.rows() * recompose_factor; ++r) {
         for (int c = 0; c < layer.columns() * recompose_factor; ++c) {
-          output.val(c, r, ch) = layer.val(c, r, ch);
+          output.val(c, r, ch) = layer.val(c, r, ch) * scaling;
         }
       }
     }

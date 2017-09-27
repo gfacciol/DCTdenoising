@@ -146,8 +146,8 @@ inline pair<Image, Image> DCTsteps(const Image &noisy, const Image &guide,
                 float G = gpatch.freq(col, row, chan);
                 float w = (G * G) / (G * G + sigma * sigma);
                 patch.freq(col, row, chan) *= w;
-                  // add to weights excluding DC
-                wP += abs(patch.freq(col, row, chan));
+                // add to weights excluding DC
+                wP += w*w;
               }
             } else {        // Hard thresholding
               if (row || col) {
