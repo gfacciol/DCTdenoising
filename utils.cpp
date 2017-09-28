@@ -18,6 +18,9 @@ using std::min;
 
 namespace imgutils {
 
+// use isometric DCT for multiscale decompose/recompose
+#define ISOMETRIC_DCT
+
 inline int SymmetricCoordinate(int pos, int size) {
   if (pos < 0) pos = -pos - 1;
   if (pos >= 2 * size) pos %= 2 * size;
@@ -160,6 +163,7 @@ void dct_inplace(Image &img) {
   fftwf_execute(plan);
   fftwf_destroy_plan(plan);
 
+#ifdef ISOMETRIC_DCT
   ////> isometric normalization
   // this normalization (and scaling) affects several other functions: 
   //     idct_inplace, decompose, recompose
@@ -176,10 +180,12 @@ void dct_inplace(Image &img) {
       img.val(col, 0, ch) /= sqrt(2.f);
     }
   }
+#else
   ////> Normalization
-  //for (int i = 0; i < img.samples(); ++i) {
-  //  img.val(i) /= 4 * img.pixels();
-  //}
+  for (int i = 0; i < img.samples(); ++i) {
+    img.val(i) /= 4 * img.pixels();
+  }
+#endif
 }
 
 /*! \brief 2D inverse DCT transform of image (channel-wise)
@@ -187,6 +193,7 @@ void dct_inplace(Image &img) {
  * Operates over the img in-place
  */
 void idct_inplace(Image &img) {
+#ifdef ISOMETRIC_DCT
   ////> isometric normalization
   long double norm_factor = sqrt(.25f / (img.rows() * img.columns()));
   for (int ch = 0; ch < img.channels(); ++ch) {
@@ -200,6 +207,7 @@ void idct_inplace(Image &img) {
       img.val(col, 0, ch) *= sqrt(2.f);
     }
   }
+#endif
 
   int n[] = {img.rows(), img.columns()};
   fftwf_r2r_kind idct2[] = {FFTW_REDFT01, FFTW_REDFT01};
@@ -222,8 +230,12 @@ vector<Image> decompose(const Image &img, int levels) {
   for (int i = 0; i < levels; ++i) {
     // Copy data
     Image layer(h, w, freq.channels());
+#ifdef ISOMETRIC_DCT
     ////> isometric normalization scaling
-    double scaling = std::sqrt((double)(w*h)/((double)(img.rows()*img.columns())));
+    const double scaling = std::sqrt((double)(w*h)/((double)(img.rows()*img.columns())));
+#else
+    const double scaling = 1.0;
+#endif
     for (int ch = 0; ch < freq.channels(); ++ch) {
       for (int r = 0; r < h; ++r) {
         for (int c = 0; c < w; ++c) {
@@ -259,8 +271,12 @@ Image recompose(const vector<Image> &pyramid, float recompose_factor) {
     Image layer = pyramid[i].copy();
     // Perform the DCT
     dct_inplace(layer);
+#ifdef ISOMETRIC_DCT
     ////> isometric normalization scaling
-    double scaling = std::sqrt((double)(output.rows()*output.columns())/((double)(layer.rows()*layer.columns())));
+    const double scaling = std::sqrt((double)(output.rows()*output.columns())/((double)(layer.rows()*layer.columns())));
+#else
+    const double scaling = 1.0;
+#endif
     // Copy data (selected by recompose_factor)
     for (int ch = 0; ch < layer.channels(); ++ch) {
       for (int r = 0; r < layer.rows() * recompose_factor; ++r) {
