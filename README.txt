@@ -8,10 +8,12 @@
 * Licence   : GPL v3+, see GPLv3.txt
 * Based on the 2010 implementation of DCT denoising by:
   Guoshen Yu <yu@cmap.polytechnique.fr> and Guillermo Sapiro <guille@umn.edu>
+* Latest version available at: https://github.com/gfacciol/DCTdenoising
 
 # OVERVIEW
 
-This source code provides an implementation of the Multiscale DCT image denoising.
+This source code provides an implementation of the "Multiscale DCT denoising"
+algorithm described in the IPOL article: http://www.ipol.im/pub/art/2017/201
 
 # UNIX/LINUX/MAC USER GUIDE
 
