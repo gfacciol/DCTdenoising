@@ -39,13 +39,13 @@ Usage:
 
 3. Runing DCT image denoising: parameters
  
-    ./dctdenoising sigma [input [output]]   # noise std, noisy image, output
-       [-w patch_size (default 8)]   # DCT denoising patch size
-       [-1 | -2 guide]               # -1: only hard thresh., -2: provide guide
-       [-no_adaptive_aggregation]    # disable adaptive aggregation weights
-       [-n scales(4)]                # multiscale: number of scales
-       [-c factor(.5)]               # multiscale: recomposition factor
-       [-single output_singlescale]  # multiscale: save also one-scale result
+    ./dctdenoising sigma [input [output]]   # noise std, noisy image, output  
+       [-w patch_size (default 8)]   # DCT denoising patch size  
+       [-1 | -2 guide]               # -1: only hard thresh., -2: provide guide  
+       [-no_adaptive_aggregation]    # disable adaptive aggregation weights  
+       [-n scales(4)]                # multiscale: number of scales  
+       [-c factor(.5)]               # multiscale: recomposition factor  
+       [-single output_singlescale]  # multiscale: save also one-scale result  
 
 
 The flag -1 permits to run DCT denoising only with the hard thresholding step,
