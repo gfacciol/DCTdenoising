@@ -1,0 +1,67 @@
+.TH "DCTdenoising User Manual" 1 "27 Jan 2018" "DCTdenoising documentation"
+
+.SH NAME
+dctdenoising
+
+.SH DESCRIPTION
+Multiscale DCT image denoising.
+
+.SH SYNOPSIS
+dctdenoising sigma [input [output]] [-1 | -2 guide] [-w patch_size (default 8)] [-c factor(.5)] [-n scales(4)] [-single output_singlescale] [-no_adaptive_aggregation]
+
+.SH OPTIONS
+.TP
+sigma
+noise std (int, mandatory, recomended = 16)
+.TP
+input
+name input graphics file (jpeg | png | tiff)
+.TP
+output
+name output graphics file (jpeg | png | tiff)
+.TP
+-1|2
+guide (-1: only hard thresh., -2: provide guide)
+.TP
+-w
+DCT denoising patch size (int, optional, default = 8)
+.TP
+-c
+factor, multiscale: recomposition factor (double, optional, default = 0.5)
+.TP
+-n
+scales, multiscale: number of scales (int, optional, default = 4)
+.TP
+-single
+output singlescale, multiscale: save also one-scale result
+.TP
+-no_adaptive_aggregation
+disable adaptive aggregation weights (bool, optional, default = false)
+
+.SH EXAMPLE
+./dctdenoising 16 images/noisy.tiff denoised.png
+
+.SH COPYRIGHT
+Copyright : (C) 2017 IPOL Image Processing On Line http://www.ipol.im/
+ Licence   : GPL v3+, see GPLv3.txt
+
+.SH SEE ALSO
+ cjpeg (1),
+ djpeg (1)
+
+.SH CONTACTS
+.TP
+Author:
+Nicola Pierazzo <nicolapierazzo@gmail.com>
+.TP
+Author:
+Gabriele Facciolo <gfacciol@gmail.com>
+.TP
+Based on the 2010 implementation of DCT denoising by:
+Guoshen Yu <yu@cmap.polytechnique.fr>
+.TP
+and
+Guillermo Sapiro <guille@umn.edu>
+.TP
+Latest version available at:
+https://github.com/gfacciol/DCTdenoising
